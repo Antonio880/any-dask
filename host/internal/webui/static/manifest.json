@@ -1,0 +1,18 @@
+{
+  "name": "AnyDask Remote + AI",
+  "short_name": "AnyDask",
+  "description": "Ultra-low latency remote desktop with on-demand AI Computer Use",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+# Binaries & build artifacts
+bin/
+*.exe
+*.apk
+*.aab
+
+# Android / Gradle
+android/.gradle/
+android/local.properties
+android/**/build/
+android/.idea/
+
+# Local secrets & temp
+.env
+*.local.json
+smoke_*.txt

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AnyDask Control DataChannel Messages",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "ping",
+        "pong",
+        "host.info",
+        "video.request_keyframe",
+        "key.event",
+        "key.text",
+        "clipboard.set",
+        "clipboard.sync",
+        "ai.start_task",
+        "ai.abort",
+        "ai.confirm_response",
+        "ai.status",
+        "ai.step_preview",
+        "ai.step_done",
+        "ai.confirm_required"
+      ]
+    },
+    "ts": { "type": "integer" },
+    "payload": { "type": "object" }
+  }
+}

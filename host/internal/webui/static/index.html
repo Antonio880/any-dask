@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <title>AnyDask Remote + AI</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Fullscreen WebRTC Video Viewport -->
+  <div id="stage" class="stage">
+    <video id="remoteVideo" class="remote-video" autoplay playsinline muted></video>
+    <!-- Visual Click Halo Overlay when AI clicks on screen -->
+    <div id="clickHalo" class="click-halo hidden" aria-hidden="true">
+      <div class="click-halo-ring"></div>
+      <div class="click-halo-dot"></div>
+    </div>
+    <!-- Subtle Touch/Cursor Feedback -->
+    <div id="touchRipple" class="touch-ripple hidden" aria-hidden="true"></div>
+  </div>
+
+  <!-- Hidden Input to summon Android soft keyboard cleanly -->
+  <textarea id="hiddenKeyboard" class="hidden-keyboard" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+
+  <!-- Connection / Empty State Overlay -->
+  <div id="connectOverlay" class="connect-overlay">
+    <div class="glass-card connect-card">
+      <div class="brand-orb-mini"></div>
+      <h1>AnyDask</h1>
+      <p id="connectStatusText" class="muted">Conectando ao host remoto...</p>
+      <div id="connectForm" class="connect-form hidden">
+        <label class="field-label">Endereço do Host (Tailscale ou LAN)</label>
+        <input id="connectUrlInput" type="text" class="glass-input" placeholder="http://100.x.y.z:8787" />
+        <label class="field-label">Token de Pareamento</label>
+        <input id="connectTokenInput" type="password" class="glass-input" placeholder="Cole o token exibido no terminal" />
+        <button id="btnManualConnect" class="btn-primary">Conectar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Dynamic Island Pill (shown when AI is THINKING / ACTING or subtle host HUD) -->
+  <div id="dynamicIsland" class="dynamic-island glass-regular hidden">
+    <div class="island-left">
+      <span id="islandOrb" class="island-dot"></span>
+      <div class="island-text">
+        <div id="islandTitle" class="island-title">Agente ativo</div>
+        <div id="islandSub" class="island-sub">Analisando tela...</div>
+      </div>
+    </div>
+    <button id="btnKillSwitch" class="btn-kill" title="Parar e assumir controle imediatamente">PARAR</button>
+  </div>
+
+  <!-- Floating AI Assistant Bot (Fluid spring physics, expressive eyes, Siri/VisionOS aura) -->
+  <button id="aiOrb" class="ai-orb state-idle" aria-label="Ativar Assistente Virtual" title="Toque para abrir · Segure para falar">
+    <span class="orb-aura"></span>
+    <span class="orb-ring"></span>
+    <span class="orb-body">
+      <svg class="bot-face" viewBox="0 0 64 64" width="38" height="38" aria-hidden="true">
+        <defs>
+          <linearGradient id="eyeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#FFFFFF" />
+            <stop offset="55%" stop-color="#7EE8FF" />
+            <stop offset="100%" stop-color="#C98BFF" />
+          </linearGradient>
+        </defs>
+        <!-- Visor glass -->
+        <rect x="8" y="13" width="48" height="38" rx="18" fill="rgba(7,10,18,0.88)" stroke="rgba(255,255,255,0.24)" stroke-width="1.5" />
+        <!-- Expressive eyes group (tracks drag direction & blinks naturally) -->
+        <g id="botEyesMini" class="bot-eyes">
+          <rect class="bot-eye eye-left" x="20" y="25" width="7.5" height="12" rx="3.75" fill="url(#eyeGrad)" />
+          <rect class="bot-eye eye-right" x="36.5" y="25" width="7.5" height="12" rx="3.75" fill="url(#eyeGrad)" />
+        </g>
+        <!-- Subtle voice/smile wave -->
+        <path id="botMouthMini" class="bot-mouth" d="M26 42 Q32 45.5 38 42" fill="none" stroke="rgba(126,232,255,0.75)" stroke-width="2" stroke-linecap="round" />
+      </svg>
+    </span>
+    <span class="orb-specular"></span>
+  </button>
+
+  <!-- Compact AI Assistant Overlay (Animated Bot Hero + Voice Wave + Glass Sheet) -->
+  <div id="aiOverlay" class="ai-overlay glass-regular hidden">
+    <div class="ai-overlay-header">
+      <div class="ai-host-chip">
+        <span class="status-dot online"></span>
+        <span id="aiHostLabel">Host</span>
+      </div>
+      <div class="ai-header-actions">
+        <button id="btnQuickModel" class="pill-chip" title="Trocar modelo de IA">Gemini</button>
+        <button id="btnCloseAiOverlay" class="icon-btn-sm" aria-label="Fechar">✕</button>
+      </div>
+    </div>
+
+    <!-- Animated Assistant Bot Hero -->
+    <div id="botHero" class="bot-hero state-idle">
+      <canvas id="botWaveCanvas" class="bot-wave-canvas" width="380" height="72"></canvas>
+      <div class="bot-hero-avatar">
+        <span class="bot-hero-halo"></span>
+        <svg class="bot-hero-svg" viewBox="0 0 80 80" width="54" height="54" aria-hidden="true">
+          <defs>
+            <linearGradient id="heroBodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#23253A" />
+              <stop offset="100%" stop-color="#0D0F18" />
+            </linearGradient>
+            <linearGradient id="heroEyeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FFFFFF" />
+              <stop offset="50%" stop-color="#64D2FF" />
+              <stop offset="100%" stop-color="#BF5AF2" />
+            </linearGradient>
+          </defs>
+          <!-- Antenna pulse -->
+          <line x1="40" y1="8" x2="40" y2="16" stroke="rgba(126,232,255,0.7)" stroke-width="2.5" stroke-linecap="round" />
+          <circle class="bot-antenna-tip" cx="40" cy="7" r="3.5" fill="#64D2FF" />
+          <!-- Head shell -->
+          <rect x="10" y="16" width="60" height="48" rx="22" fill="url(#heroBodyGrad)" stroke="rgba(255,255,255,0.28)" stroke-width="1.8" />
+          <!-- Inner visor -->
+          <rect x="16" y="23" width="48" height="34" rx="16" fill="#060811" stroke="rgba(100,210,255,0.22)" stroke-width="1.2" />
+          <!-- Expressive eyes -->
+          <g id="botEyesHero" class="bot-eyes">
+            <rect class="bot-eye eye-left" x="27" y="32" width="8.5" height="14" rx="4.25" fill="url(#heroEyeGrad)" />
+            <rect class="bot-eye eye-right" x="44.5" y="32" width="8.5" height="14" rx="4.25" fill="url(#heroEyeGrad)" />
+          </g>
+          <!-- Smile / Audio arc -->
+          <path class="bot-mouth" d="M33 50 Q40 54.5 47 50" fill="none" stroke="rgba(100,210,255,0.85)" stroke-width="2.2" stroke-linecap="round" />
+        </svg>
+      </div>
+      <div class="bot-hero-copy">
+        <div id="botHeroTitle" class="bot-hero-title">AnyDask AI</div>
+        <div id="botHeroSub" class="bot-hero-sub">Estou vendo sua tela. O que fazemos?</div>
+      </div>
+    </div>
+
+    <div id="aiFeed" class="ai-feed hidden"></div>
+
+    <div class="ai-quick-chips">
+      <button class="suggestion-chip" data-prompt="Analise o que está na tela e me diga se há algum erro">Explicar tela</button>
+      <button class="suggestion-chip" data-prompt="Abra o terminal na pasta atual">Abrir terminal</button>
+      <button class="suggestion-chip" data-prompt="Corrija o erro visível e rode os testes">Corrigir erro</button>
+    </div>
+
+    <div class="ai-input-row">
+      <button id="btnVoiceToggle" class="voice-btn" aria-label="Falar instrução" title="Toque para gravar voz">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"></rect>
+          <path d="M5 10v2a7 7 0 0 0 14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="22"></line>
+        </svg>
+      </button>
+      <input id="aiPromptInput" type="text" class="ai-text-input" placeholder="Peça para eu agir na tela..." enterkeyhint="send" />
+      <button id="btnSendAiPrompt" class="send-btn" aria-label="Enviar">↑</button>
+    </div>
+  </div>
+
+  <!-- Guardrail Confirmation Glass Modal -->
+  <div id="confirmModal" class="modal-backdrop hidden">
+    <div class="glass-card glass-thick confirm-card">
+      <div class="confirm-badge">CONFIRMAÇÃO DE SEGURANÇA</div>
+      <h3 id="confirmTitle">Ação sensível detectada</h3>
+      <p id="confirmReason" class="muted"></p>
+      <pre id="confirmCommand" class="code-box"></pre>
+      <div class="confirm-actions">
+        <button id="btnConfirmDeny" class="btn-glass">Recusar</button>
+        <button id="btnConfirmApprove" class="btn-danger">Permitir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible Dev Shortcut Bar (Apple Thin Glass) -->
+  <div id="devBarWrapper" class="devbar-wrapper">
+    <button id="btnToggleDevBar" class="devbar-handle glass-thin" aria-label="Alternar barra de atalhos">
+      <span class="handle-pill"></span>
+      <span id="hudMiniStats" class="hud-mini">-- ms</span>
+    </button>
+
+    <div id="devBar" class="devbar glass-thin">
+      <div class="devbar-scroll">
+        <button class="dev-key mod-key" data-mod="PRIMARY" id="btnModPrimary">Ctrl</button>
+        <button class="dev-key mod-key" data-mod="ALT">Alt</button>
+        <button class="dev-key mod-key" data-mod="SHIFT">⇧</button>
+        <span class="dev-sep"></span>
+        <button class="dev-key" data-key="Escape">Esc</button>
+        <button class="dev-key" data-key="Tab">Tab</button>
+        <button class="dev-key accent-key" data-combo="CTRL+c">^C</button>
+        <button class="dev-key" data-key="Enter">↵</button>
+        <span class="dev-sep"></span>
+        <button class="dev-key" data-key="ArrowLeft">←</button>
+        <button class="dev-key" data-key="ArrowUp">↑</button>
+        <button class="dev-key" data-key="ArrowDown">↓</button>
+        <button class="dev-key" data-key="ArrowRight">→</button>
+        <span class="dev-sep"></span>
+        <button class="dev-key" data-text="/">/</button>
+        <button class="dev-key" data-text="|">|</button>
+        <button class="dev-key" data-text="`">`</button>
+        <button class="dev-key" data-text="~">~</button>
+      </div>
+      <div class="devbar-tools">
+        <button id="btnZoomToggle" class="tool-btn" title="Zoom rápido / Resetar 1x">1x</button>
+        <button id="btnRotate" class="tool-btn" title="Girar tela (Paisagem / Retrato)">↻</button>
+        <button id="btnKeyboard" class="tool-btn" title="Teclado">⌨</button>
+        <button id="btnInputMode" class="tool-btn" title="Alternar Toque Direto / Trackpad">Toque</button>
+        <button id="btnHosts" class="tool-btn" title="Alternar Máquina (Mac Mini / PC)">Hosts</button>
+        <button id="btnSettings" class="tool-btn" title="Configurações e API Keys">⚙</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Host Switcher Glass Sheet (Quick switch Mac Mini <-> Windows 11) -->
+  <div id="hostsModal" class="modal-backdrop hidden">
+    <div class="glass-card glass-thick sheet-card">
+      <div class="sheet-header">
+        <h2>Máquinas Remotas</h2>
+        <button class="icon-btn-sm close-modal" data-close="hostsModal">✕</button>
+      </div>
+      <div id="hostsList" class="hosts-list"></div>
+      <div class="sheet-divider"></div>
+      <h3 class="section-sub">Adicionar máquina (Mac Mini / PC)</h3>
+      <div class="form-grid">
+        <input id="newHostName" class="glass-input" placeholder="Nome (ex: Mac Mini)" />
+        <input id="newHostUrl" class="glass-input" placeholder="http://100.x.y.z:8787" />
+        <input id="newHostToken" class="glass-input" type="password" placeholder="Token do host" />
+        <button id="btnAddHost" class="btn-primary">Salvar Máquina</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Glass Sheet (Model-Agnostic BYOK API Keys) -->
+  <div id="settingsModal" class="modal-backdrop hidden">
+    <div class="glass-card glass-thick sheet-card">
+      <div class="sheet-header">
+        <h2>Configurações de IA (BYOK)</h2>
+        <button class="icon-btn-sm close-modal" data-close="settingsModal">✕</button>
+      </div>
+
+      <div class="form-grid">
+        <label class="field-label">Provedor Ativo</label>
+        <select id="cfgProvider" class="glass-input">
+          <option value="gemini">Google Gemini (Vision + Voz Nativa)</option>
+          <option value="anthropic">Anthropic Claude (Computer Use)</option>
+          <option value="openai">OpenAI / OpenRouter (Compatível)</option>
+        </select>
+
+        <label class="field-label">Modelo</label>
+        <input id="cfgModel" class="glass-input" placeholder="gemini-3-flash-preview" />
+
+        <label class="field-label">API Key (armazenada localmente neste aparelho)</label>
+        <input id="cfgApiKey" type="password" class="glass-input" placeholder="Cole sua chave de API" />
+
+        <label class="field-label">Base URL (opcional — ex: https://openrouter.ai/api/v1)</label>
+        <input id="cfgBaseUrl" class="glass-input" placeholder="Padrão do provedor" />
+
+        <label class="toggle-row">
+          <span>Pedir confirmação para comandos destrutivos (Guardrails)</span>
+          <input id="cfgRequireConfirm" type="checkbox" checked />
+        </label>
+
+        <label class="field-label">Sensibilidade do Trackpad (<span id="sensVal">1.8</span>x)</label>
+        <input id="cfgSensitivity" type="range" min="0.8" max="3.5" step="0.1" value="1.8" />
+
+        <button id="btnSaveSettings" class="btn-primary">Salvar Configurações</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast feedback -->
+  <div id="toast" class="toast glass-thin hidden"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
