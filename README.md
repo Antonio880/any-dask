@@ -8,14 +8,14 @@ Sistema próprio de acesso remoto de baixíssima latência (`~10–15ms @ 60fps`
 
 ## Principais Recursos
 
-- **Acesso Remoto `< 20ms` @ 60fps:** WebRTC P2P (`pion/webrtc/v4`) com hardware H.264 (`ddagrab → h264_amf/nvenc/qsv` no Windows 11; `avfoundation → h264_videotoolbox` no macOS) + botão **`HD` / `⚡Turbo` (720p)** em 1 toque.
-- **Multi-Monitor Nativo:** troca instantânea entre Tela 1 / Tela 2+ (`🖥 1/2`) sem desconectar, sincronizando vídeo, toques exatos, screenshots da IA e o overlay Liquid Glass no monitor ativo.
+- **Acesso Remoto `< 20ms` @ 60fps:** WebRTC P2P (`pion/webrtc/v4`) com hardware H.264 (`ddagrab -> h264_amf/nvenc/qsv` no Windows 11; `avfoundation -> h264_videotoolbox` no macOS) + alternância **`HD` / `Turbo` (720p)** em 1 toque.
+- **Multi-Monitor Nativo:** troca instantânea entre Tela 1 / Tela 2+ (`Tela 1/2`) sem desconectar, sincronizando vídeo, toques exatos, screenshots da IA e o overlay Liquid Glass no monitor ativo.
 - **Estética iOS 26 Liquid Glass (Dual-Side):**
-  - **No celular:** app Android nativo em tela cheia imersiva, superfícies de vidro líquido, Toque Direto como padrão (clica no pixel exato), Pinch-to-Zoom (`1x–4x`) + Pan suave, rotação Paisagem em 1 toque (`↻`) e barra de atalhos Dev retrátil.
-  - **Na tela do computador controlado (Windows 11 & macOS):** overlay nativo 100% *click-through* com borda líquida Apple Intelligence, Dynamic Island no topo (com `NSVisualEffectView` blur real no macOS) e *Liquid Glass Ripples* a cada clique — ligue/desligue em 1 toque no botão **`✨`** (ou inicie com `--no-overlay`).
+  - **No celular:** app Android nativo em tela cheia imersiva, superfícies de vidro líquido, Toque Direto como padrão (clica no pixel exato), Pinch-to-Zoom (`1x–4x`) + Pan suave, rotação Paisagem em 1 toque e barra de atalhos Dev retrátil.
+  - **Na tela do computador controlado (Windows 11 & macOS):** overlay nativo 100% *click-through* com borda líquida Apple Intelligence, Dynamic Island no topo (com `NSVisualEffectView` blur real no macOS) e *Liquid Glass Ripples* a cada clique — ative/desative em 1 toque no botão **Vidro** (ou inicie com `--no-overlay`).
 - **Bot Assistente Virtual de Computer Use (Sob Demanda, Model-Agnostic):**
   - Fica 100% inativo durante uso manual (`0%` overhead/tokens).
-  - **Segure o Bot flutuante** para gravar voz nativamente (*Hold-to-Talk*, funciona em HTTP/LAN/Tailscale) → **solte** para enviar na hora.
+  - **Segure o Bot flutuante** para gravar voz nativamente (*Hold-to-Talk*, funciona em HTTP/LAN/Tailscale) e **solte** para enviar na hora.
   - **Console ao Vivo Liquid Glass** logo abaixo da Dynamic Island mostrando cada etapa em tempo real + botão vermelho **`PARAR`** (Kill Switch `< 10ms`) + guardrails para comandos destrutivos.
   - Suporta **Google Gemini** (padrão rápido `gemini-3.1-flash-lite` com fallback automático e áudio multimodal nativo), **Anthropic Claude** e **OpenAI / OpenRouter** (BYOK).
 
@@ -65,9 +65,9 @@ chmod +x start-anydask-mac.sh
 O script compila o binário nativo (`arm64` ou `x86_64`) com aceleração `h264_videotoolbox` + `NSVisualEffectView` Liquid Glass e imprime no terminal as URLs `[LAN]` e `[TAILSCALE]` + o **Token**.
 
 ### Passo 3 — Permissões do macOS (apenas 1ª vez)
-Vá em **Ajustes do Sistema → Privacidade e Segurança** e marque o **Terminal** (ou iTerm) em:
+Vá em **Ajustes do Sistema -> Privacidade e Segurança** e marque o **Terminal** (ou iTerm) em:
 1. **Gravação de Tela e Áudio do Sistema** *(transmissão 60fps)*
-2. **Acessibilidade** *(controle de mouse, cliques e atalhos `⌘ Cmd`)*
+2. **Acessibilidade** *(controle de mouse, cliques e atalhos `Cmd`)*
 
 Depois feche (`Ctrl+C`) e execute `./start-anydask-mac.sh` novamente.
 
@@ -79,9 +79,9 @@ Depois feche (`Ctrl+C`) e execute `./start-anydask-mac.sh` novamente.
 2. Deixe o Tailscale ligado nos aparelhos. O terminal do Host passará a exibir automaticamente:
    `[TAILSCALE] http://100.x.y.z:8787/?token=...`
 3. **Como deixar acessível 24/7 sem cair:**
-   - **Windows 11:** *Configurações → Sistema → Energia → Tela e suspensão* → **Suspender = Nunca** (não bloqueie com `Win+L`; se quiser apagar a tela, desligue o monitor físico).
-   - **Mac Mini / MacBook:** *Ajustes do Sistema → Energia* → ative **"Impedir repouso automático quando a tela estiver desligada"** (ou rode `caffeinate -di &`). Se o Mac Mini ficar sem monitor físico (*headless*), use o app gratuito **BetterDisplay** ou um HDMI Dummy Plug.
-   - **Tailscale permanente:** em `https://login.tailscale.com/admin/machines` → clique em `...` em cada máquina → **"Disable key expiry"** (remove a expiração padrão de 180 dias).
+   - **Windows 11:** *Configurações -> Sistema -> Energia -> Tela e suspensão* -> **Suspender = Nunca** (não bloqueie com `Win+L`; se quiser apagar a tela, desligue o monitor físico).
+   - **Mac Mini / MacBook:** *Ajustes do Sistema -> Energia* -> ative **"Impedir repouso automático quando a tela estiver desligada"** (ou rode `caffeinate -di &`). Se o Mac Mini ficar sem monitor físico (*headless*), use o app gratuito **BetterDisplay** ou um HDMI Dummy Plug.
+   - **Tailscale permanente:** em `https://login.tailscale.com/admin/machines` -> clique em `...` em cada máquina -> **"Disable key expiry"** (remove a expiração padrão de 180 dias).
 
 ---
 
@@ -92,7 +92,7 @@ Se o APK já estiver compilado em `bin/anydask-android.apk`, basta abrir no Chro
 ```text
 http://<IP-TAILSCALE-OU-LAN>:8787/download/anydask.apk
 ```
-Toque no arquivo baixado → **Instalar / Atualizar** (conceda permissão de Microfone para o *Hold-to-Talk* nativo).
+Toque no arquivo baixado -> **Instalar / Atualizar** (conceda permissão de Microfone para o *Hold-to-Talk* nativo).
 
 ### Compilar o APK do zero (opcional, em Windows/macOS com JDK 17 + Android SDK 35)
 ```bash
@@ -102,7 +102,7 @@ gradle assembleDebug --no-daemon
 ```
 
 ### Alternar entre Windows 11 e Mac no mesmo app
-Toque em **`Hosts`** na barra inferior → **Adicionar máquina** → informe o Nome, a URL Tailscale (`http://100.x.y.z:8787`) e o Token do outro computador. Depois basta 1 toque para alternar entre eles (e a barra troca automaticamente `Ctrl` ↔ `⌘ Cmd`).
+Toque em **`Hosts`** na barra inferior -> **Adicionar máquina** -> informe o Nome, a URL Tailscale (`http://100.x.y.z:8787`) e o Token do outro computador. Depois basta 1 toque para alternar entre eles (e a barra troca automaticamente `Ctrl` / `Cmd`).
 
 ---
 
@@ -117,12 +117,12 @@ Toque em **`Hosts`** na barra inferior → **Adicionar máquina** → informe o 
 - **Toque em `Toque / Track`:** alterna para modo Trackpad relativo quando preferir.
 
 ### Barra Inferior (2 Linhas Liquid Glass)
-- **Linha 1 (Controles):** `🖥 1/2` (trocar monitor) · `HD / ⚡Turbo` (1080p vs 720p ultra-rápido) · `✨` (Vidro Líquido no monitor do PC/Mac) · `1x` (zoom rápido `2.2x`) · `↻` (Paisagem/Retrato) · `Toque` · `⌨` (Teclado) · `Hosts` · `⚙` (API Keys BYOK).
-- **Linha 2 (Atalhos Dev):** `Ctrl / ⌘ Cmd`, `Alt`, `⇧`, `Esc`, `Tab`, `^C`, `↵`, setas `← ↑ ↓ →`, `/`, `|`, `` ` ``, `~`.
+- **Linha 1 (Controles):** `Tela 1/2` (trocar monitor) · `HD / Turbo` (1080p vs 720p ultra-rápido) · `Vidro` (overlay Liquid Glass no PC/Mac) · `1x` (zoom rápido `2.2x`) · `Girar` (Paisagem/Retrato) · `Toque` · `Teclado` · `Hosts` · `Config` (API Keys BYOK).
+- **Linha 2 (Atalhos Dev):** `Ctrl / Cmd`, `Alt`, `Shift`, `Esc`, `Tab`, `^C`, `Enter`, setas, `/`, `|`, `` ` ``, `~`.
 - Toque no handle superior (`11ms · 60fps`) para recolher/mostrar a barra inteira.
 
 ### Bot Assistente Virtual (Computer Use)
-- **Segurar o Bot flutuante:** começa a gravar sua voz na hora (*Hold-to-Talk*) → **soltar** envia direto para a IA agir!
+- **Segurar o Bot flutuante:** começa a gravar sua voz na hora (*Hold-to-Talk*) -> **soltar** envia direto para a IA agir.
 - **1 toque no Bot:** abre o painel com campo de texto, chips rápidos e seletor de modelo.
 - **Arrastar o Bot:** move livremente pela tela com física de mola e snap magnético nas bordas.
 - **Botão vermelho `PARAR` (Dynamic Island):** interrompe a IA imediatamente (`< 10ms`) e devolve o controle manual.
@@ -138,7 +138,7 @@ Crie `~/.anydask/ai-config.json` (no Windows: `%USERPROFILE%\.anydask\ai-config.
   "require_confirm": true
 }
 ```
-Ou configure diretamente no celular tocando em **`⚙`** (suporta **Gemini**, **Claude** e **OpenAI/OpenRouter**).
+Ou configure diretamente no celular tocando em **Configurações** (suporta **Gemini**, **Claude** e **OpenAI/OpenRouter**).
 
 ---
 

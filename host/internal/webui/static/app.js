@@ -719,10 +719,10 @@
       case "video.quality_state": {
         videoProfile = msg.payload?.profile || "hd";
         if (btnTurboMode) {
-          btnTurboMode.textContent = videoProfile === "turbo" ? "⚡Turbo" : "HD";
+          btnTurboMode.textContent = videoProfile === "turbo" ? "Turbo" : "HD";
           btnTurboMode.classList.toggle("active", videoProfile === "turbo");
         }
-        showToast(videoProfile === "turbo" ? "⚡ Modo Turbo ativo (720p · máxima velocidade)" : "💎 Modo HD ativo (1080p)");
+        showToast(videoProfile === "turbo" ? "Modo Turbo ativo (720p · máxima velocidade)" : "Modo HD ativo (1080p)");
         break;
       }
       case "ai.status": {
@@ -732,7 +732,7 @@
       }
       case "ai.step_preview": {
         const p = msg.payload || {};
-        appendFeed(`⚡ Passo ${p.step}: ${p.description}`);
+        appendFeed(`Passo ${p.step}: ${p.description}`);
         if (p.has_point) {
           showClickHalo(p.x_norm, p.y_norm);
         }
@@ -743,10 +743,10 @@
         if (p.success) {
           const shortOut = (p.output || "").trim().split("\n")[0].slice(0, 90);
           if (shortOut && shortOut !== "(sem saída)") {
-            appendFeed(`✓ ${shortOut}`, "done");
+            appendFeed(`OK · ${shortOut}`, "done");
           }
         } else if (p.output) {
-          appendFeed(`⚠️ ${p.output}`, "error");
+          appendFeed(`Aviso · ${p.output}`, "error");
         }
         break;
       }
@@ -754,7 +754,7 @@
         const enabled = !!msg.payload?.enabled;
         if (btnGlassToggle) btnGlassToggle.classList.toggle("active", enabled);
         if (liquidEdgeGlow) liquidEdgeGlow.style.opacity = enabled ? "1" : "0.15";
-        showToast(enabled ? "✨ Vidro Líquido ativado na tela do computador" : "Vidro Líquido pausado na tela do computador");
+        showToast(enabled ? "Vidro Líquido ativado na tela do computador" : "Vidro Líquido pausado na tela do computador");
         break;
       }
       case "ai.confirm_required": {
@@ -849,7 +849,7 @@
       if (btnKillSwitch) btnKillSwitch.classList.remove("hidden");
       islandTitle.textContent = step ? `AnyDask AI · Passo ${step}/${maxStep || 18}` : "AnyDask AI";
       islandSub.textContent = message || "Operando computador...";
-      if (message && (message.startsWith("📸") || message.startsWith("🧠"))) {
+      if (message && (message.startsWith("Capturando") || message.startsWith("Analisando"))) {
         appendFeed(message);
       }
     } else {
@@ -862,7 +862,7 @@
       clickHalo.classList.add("hidden");
 
       if (state === "COMPLETED") {
-        appendFeed(`✅ ${message}`, "done");
+        appendFeed(`Concluído · ${message}`, "done");
         islandTitle.textContent = "Concluído";
         islandSub.textContent = message || "Tarefa finalizada!";
         if (btnKillSwitch) btnKillSwitch.classList.add("hidden");
@@ -871,12 +871,12 @@
           if (aiState === "COMPLETED" && dynamicIslandWrap) dynamicIslandWrap.classList.add("hidden");
         }, 5500);
       } else if (state === "ABORTED") {
-        appendFeed("🛑 Interrompido — você está no controle.");
+        appendFeed("Interrompido — você está no controle.");
         if (dynamicIslandWrap) dynamicIslandWrap.classList.add("hidden");
         showToast("Controle manual retomado!", 2200);
         haptic(30);
       } else if (state === "ERROR") {
-        appendFeed(`❌ ${message}`, "error");
+        appendFeed(`Erro · ${message}`, "error");
         islandTitle.textContent = "Erro na IA";
         islandSub.textContent = message || "Falha ao executar tarefa";
         if (btnKillSwitch) btnKillSwitch.classList.add("hidden");
@@ -1248,7 +1248,7 @@
     prompt = (prompt || "").trim();
     if (!prompt && !audioBase64) return;
     if (!settings.apiKey) {
-      showToast("Configure sua API Key primeiro nas Configurações ⚙", 3200);
+      showToast("Configure sua API Key primeiro nas Configurações", 3200);
       openSettingsModal();
       return;
     }
@@ -1256,7 +1256,7 @@
     aiFeed.innerHTML = "";
     if (aiLiveLog) aiLiveLog.innerHTML = "";
     startAITimer();
-    appendFeed(prompt ? `💬 "${prompt}"` : "🎙️ Instrução por voz enviada");
+    appendFeed(prompt ? `"${prompt}"` : "Instrução por voz enviada");
     const ok = sendControl("ai.start_task", {
       prompt,
       audio_base64: audioBase64,
@@ -1315,10 +1315,10 @@
     const list = hostInfo.displays || [];
     const idx = hostInfo.active_display || 0;
     if (list.length > 1) {
-      btnDisplaySwitch.textContent = `🖥 ${idx + 1}/${list.length}`;
+      btnDisplaySwitch.textContent = `Tela ${idx + 1}/${list.length}`;
       btnDisplaySwitch.classList.add("active");
     } else {
-      btnDisplaySwitch.textContent = `🖥 1`;
+      btnDisplaySwitch.textContent = `Tela 1`;
       btnDisplaySwitch.classList.remove("active");
     }
   }
@@ -1334,7 +1334,7 @@
       const nextIdx = ((hostInfo.active_display || 0) + 1) % list.length;
       const target = list[nextIdx];
       sendControl("display.switch", { index: nextIdx });
-      showToast(`🖥 Trocando para ${target?.name || `Monitor ${nextIdx + 1}`}...`);
+      showToast(`Trocando para ${target?.name || `Monitor ${nextIdx + 1}`}...`);
     });
   }
 
@@ -1488,7 +1488,7 @@
         </div>
         <div style="display:flex;gap:6px;">
           <button class="btn-primary" style="padding:7px 12px;font-size:12px;">Conectar</button>
-          <button class="icon-btn-sm" title="Remover">✕</button>
+          <button class="icon-btn-sm" title="Remover">&times;</button>
         </div>
       `;
       row.querySelector(".btn-primary").addEventListener("click", () => {

@@ -8,7 +8,7 @@ tags:
   - architecture
 ---
 
-# ⚖️ Registro de Decisões de Arquitetura (ADRs)
+# Registro de Decisões de Arquitetura (ADRs)
 
 Voltar para [[00-INDEX]] | Ver arquitetura em [[01-ARCHITECTURE]]
 

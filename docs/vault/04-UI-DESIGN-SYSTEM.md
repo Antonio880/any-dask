@@ -10,7 +10,7 @@ tags:
   - compose
 ---
 
-# ✨ UI Design System — Estética Apple Premium (visionOS / iOS)
+# UI Design System — Estética Apple Premium (visionOS / iOS)
 
 Voltar para [[00-INDEX]] | Ver arquitetura em [[01-ARCHITECTURE]] | Ver backlog em [[03-BACKLOG-PROGRESS]]
 
@@ -22,6 +22,7 @@ Voltar para [[00-INDEX]] | Ver arquitetura em [[01-ARCHITECTURE]] | Ver backlog 
 2. **Profundidade por Luz e Blur (Glassmorphism Real):** Não usar cinzas chapados opacos. Superfícies devem desfocar em tempo real o stream de vídeo por trás (`TextureView` + `Haze` / `RenderEffect` AGSL), com borda superior/interna especular de `1dp` simulando refração de vidro estilo visionOS.
 3. **Fisicalidade Orgânica:** Todas as transições usam física de mola (`Spring.DampingRatioNoBouncy` / `MediumBouncy`, `StiffnessMediumLow`) sem movimentos lineares robóticos.
 4. **Feedback Háptico Sutil:** Haptics diferenciados no Android (`HapticFeedbackType` / `VibrationEffect`) para clique de mouse, ativação do Orb, passo do agente e acionamento do Kill Switch.
+5. **Zero Emojis (Estética Nativa Apple):** Nunca usar emojis na interface, nos logs ao vivo nem na documentação. Usar exclusivamente ícones vetoriais SVG limpos (estilo SF Symbols) e tipografia clara.
 
 ---
 

@@ -962,6 +962,13 @@ html, body {
   cursor: pointer;
   transition: transform 0.18s var(--spring), background 0.2s ease, border-color 0.2s ease;
 }
+.tool-btn.icon-svg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 9px;
+}
+
 .tool-btn:active { background: rgba(255, 255, 255, 0.24); transform: scale(0.91); }
 .tool-btn.active {
   background: linear-gradient(135deg, rgba(100, 210, 255, 0.32), rgba(94, 92, 230, 0.42));

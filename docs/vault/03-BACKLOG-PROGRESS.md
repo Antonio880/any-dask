@@ -8,15 +8,15 @@ tags:
   - progress
 ---
 
-# 📋 Backlog & Progresso (Roadmap 4 Semanas)
+# Backlog & Progresso (Roadmap 4 Semanas)
 
 Voltar para [[00-INDEX]] | Ver arquitetura em [[01-ARCHITECTURE]] | Ver design em [[04-UI-DESIGN-SYSTEM]]
 
 ---
 
-## 🔄 Status Atual
+## Status Atual
 
-### ✅ Done
+### Done
 - [x] **Fase 1:** Criação do Obsidian Memory Bank em `/docs/vault/` (5 documentos base)
 - [x] **Fase 1:** Definição da arquitetura de rede (Tailscale + WebRTC P2P), pipeline de vídeo/input e loop de Computer Use
 - [x] **Fase 1:** Definição dos ADRs (ADR-001 a ADR-007) e Design System Apple Glass
@@ -46,10 +46,10 @@ Voltar para [[00-INDEX]] | Ver arquitetura em [[01-ARCHITECTURE]] | Ver design e
 - [x] **iOS 26 Liquid Glass Dual-Side (Celular + Tela do PC/Mac):**
   - [x] Overlay nativo click-through no **Windows 11** (`UpdateLayeredWindow` per-pixel alpha: borda líquida Apple Intelligence + Dynamic Island com waveform viva + Liquid Glass Ripples em cada clique)
   - [x] Overlay nativo click-through no **macOS** (`NSWindow` + `NSVisualEffectView` blur real da Apple + borda líquida + Liquid Glass Ripples)
-  - [x] Upgrade **iOS 26 Liquid Glass** no App Mobile (moldura perimetral sincronizada, reflexo especular diagonal, touch ripples refrativos e botão `✨` na DevBar para ligar/desligar o vidro no PC/Mac)
+  - [x] Upgrade **iOS 26 Liquid Glass** no App Mobile (moldura perimetral sincronizada, reflexo especular diagonal, touch ripples refrativos e botão `` na DevBar para ligar/desligar o vidro no PC/Mac)
 - [x] **Multi-Monitor Nativo (macOS + Windows 11) + Modo Turbo Ultra-Latência:**
-  - [x] Descoberta de todos os monitores (`CGGetActiveDisplayList` no macOS / `EnumDisplayMonitors` no Windows) + troca ao vivo sem desconectar (`🖥 1/2` na DevBar) + mapeamento exato de coordenadas de toque e Computer Use no monitor selecionado
-  - [x] Redução agressiva de latência: leitura direta do pipe sem `bufio`, `-probesize 32 -analyzeduration 0`, `-pixel_format nv12` nativo no `avfoundation` do Mac, clique reduzido de `12ms` → `4ms`, clear parcial de memória no overlay Windows, e botão **`HD` / `⚡Turbo` (720p@60fps)** em 1 toque
+  - [x] Descoberta de todos os monitores (`CGGetActiveDisplayList` no macOS / `EnumDisplayMonitors` no Windows) + troca ao vivo sem desconectar (` 1/2` na DevBar) + mapeamento exato de coordenadas de toque e Computer Use no monitor selecionado
+  - [x] Redução agressiva de latência: leitura direta do pipe sem `bufio`, `-probesize 32 -analyzeduration 0`, `-pixel_format nv12` nativo no `avfoundation` do Mac, clique reduzido de `12ms` → `4ms`, clear parcial de memória no overlay Windows, e botão **`HD` / `Turbo` (720p@60fps)** em 1 toque
 - [x] **Portal Liquid Glass de Conexão & Fix WebView Android (`v1.0.3`):**
   - [x] Tela de conexão Apple Liquid Glass com Bot animado + anéis orbitais + stepper (`Sinal -> Túnel P2P -> 60 FPS`) e vídeo oculto até o 1º frame real decodificado
   - [x] `MainActivity.kt` sobrescrevendo `getDefaultVideoPoster()` (elimina o ícone cinza ▶ esticado do Android WebView) + `LOAD_NO_CACHE` + `clearCache(true)` (resolve cache preso de UI antiga)
@@ -58,17 +58,17 @@ Voltar para [[00-INDEX]] | Ver arquitetura em [[01-ARCHITECTURE]] | Ver design e
   - [x] **Console ao Vivo Liquid Glass (`#aiLiveLog`)** abaixo da Dynamic Island + cronômetro ao vivo (`0.0s`) exibindo cada etapa, ação, saída e erro em tempo real
   - [x] **Hold-to-Talk nativo no Bot Flutuante** (`MainActivity.kt` `MediaRecorder` AAC `audio/mp4` sem depender de HTTPS + `#voiceHud` ao vivo): segura o Bot -> grava -> solta -> envia na hora para o Gemini agir!
 
-### 🚧 In Progress
+### In Progress
 - [ ] Validação ao vivo do Hold-to-Talk e do agente ultra-rápido (`~1.5s/passo`) no Android (`v1.0.4`) + Windows 11 + Mac
 
-### 📌 Próximo Passo Imediato
+### Próximo Passo Imediato
 1. Rodar `bin\anydask-host.exe` neste Windows 11 para o usuário testar já no Android!
 2. Compilar no Mac Mini e cadastrar os dois hosts no **Host Switcher**.
 3. Opcional (Fase 1.5): Empacotar cliente nativo Android (Kotlin + Jetpack Compose) e auto-start como serviço Windows/LaunchAgent macOS.
 
 ---
 
-## 🗓️ Roadmap Detalhado (Meta: 1 Mês)
+## Roadmap Detalhado (Meta: 1 Mês)
 
 ### Semana 1 — Core Remote MVP (Vídeo + Input Funcional)
 > **Objetivo:** Abrir o app Android, conectar no Windows 11 ou Mac Mini via Tailscale, ver a tela fluída e controlar mouse/teclado.
@@ -119,7 +119,7 @@ Voltar para [[00-INDEX]] | Ver arquitetura em [[01-ARCHITECTURE]] | Ver design e
 
 ---
 
-## 📝 Notas de Escopo (Fora do MVP de 1 Mês)
+## Notas de Escopo (Fora do MVP de 1 Mês)
 Itens deliberadamente adiados para Fase 2 para proteger o prazo:
 - Áudio desktop bidirecional do PC para o celular (foco inicial é controle de trabalho/dev e voz do usuário -> IA; áudio do PC entra na Fase 2 via segunda MediaTrack Opus).
 - Cliente iOS / Web.

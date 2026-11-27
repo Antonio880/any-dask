@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   <title>AnyDask Remote + AI</title>
-  <link rel="stylesheet" href="/styles.css?v=6" />
+  <link rel="stylesheet" href="/styles.css?v=7" />
 </head>
 <body>
   <!-- Fullscreen WebRTC Video Viewport -->
@@ -150,7 +150,7 @@
       </div>
       <div class="ai-header-actions">
         <button id="btnQuickModel" class="pill-chip" title="Trocar modelo de IA">Gemini</button>
-        <button id="btnCloseAiOverlay" class="icon-btn-sm" aria-label="Fechar">✕</button>
+        <button id="btnCloseAiOverlay" class="icon-btn-sm" aria-label="Fechar">&times;</button>
       </div>
     </div>
 
@@ -236,17 +236,23 @@
     </button>
 
     <div id="devBar" class="devbar glass-thin">
-      <!-- Row 1: Quick Session & Monitor Controls (always visible, scrollable, never clipped!) -->
+      <!-- Row 1: Quick Session & Monitor Controls (clean Apple SF-style labels/SVG, zero emojis) -->
       <div class="devbar-tools">
-        <button id="btnDisplaySwitch" class="tool-btn" title="Alternar Monitor (Tela 1 / Tela 2)">🖥 1</button>
+        <button id="btnDisplaySwitch" class="tool-btn" title="Alternar Monitor (Tela 1 / Tela 2)">Tela 1</button>
         <button id="btnTurboMode" class="tool-btn" title="Alternar Modo Turbo (Ultra-Rápido) / HD">HD</button>
-        <button id="btnGlassToggle" class="tool-btn active" title="Ligar/Desligar Vidro Líquido na tela do computador">✨</button>
+        <button id="btnGlassToggle" class="tool-btn active" title="Ligar/Desligar Vidro Líquido na tela do computador">Glass</button>
         <button id="btnZoomToggle" class="tool-btn" title="Zoom rápido / Resetar 1x">1x</button>
-        <button id="btnRotate" class="tool-btn" title="Girar tela (Paisagem / Retrato)">↻</button>
+        <button id="btnRotate" class="tool-btn icon-svg-btn" title="Girar tela (Paisagem / Retrato)" aria-label="Girar tela">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+        </button>
         <button id="btnInputMode" class="tool-btn" title="Alternar Toque Direto / Trackpad">Toque</button>
-        <button id="btnKeyboard" class="tool-btn" title="Teclado">⌨</button>
+        <button id="btnKeyboard" class="tool-btn icon-svg-btn" title="Teclado" aria-label="Teclado">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 13h6"/></svg>
+        </button>
         <button id="btnHosts" class="tool-btn" title="Alternar Máquina (Mac Mini / PC)">Hosts</button>
-        <button id="btnSettings" class="tool-btn" title="Configurações e API Keys">⚙</button>
+        <button id="btnSettings" class="tool-btn icon-svg-btn" title="Configurações e API Keys" aria-label="Configurações">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
       </div>
       <!-- Row 2: Dev Keyboard Shortcuts -->
       <div class="devbar-scroll">
@@ -277,7 +283,7 @@
     <div class="glass-card glass-thick sheet-card">
       <div class="sheet-header">
         <h2>Máquinas Remotas</h2>
-        <button class="icon-btn-sm close-modal" data-close="hostsModal">✕</button>
+        <button class="icon-btn-sm close-modal" data-close="hostsModal">&times;</button>
       </div>
       <div id="hostsList" class="hosts-list"></div>
       <div class="sheet-divider"></div>
@@ -296,7 +302,7 @@
     <div class="glass-card glass-thick sheet-card">
       <div class="sheet-header">
         <h2>Configurações de IA (BYOK)</h2>
-        <button class="icon-btn-sm close-modal" data-close="settingsModal">✕</button>
+        <button class="icon-btn-sm close-modal" data-close="settingsModal">&times;</button>
       </div>
 
       <div class="form-grid">
@@ -332,6 +338,6 @@
   <!-- Toast feedback -->
   <div id="toast" class="toast glass-thin hidden"></div>
 
-  <script src="/app.js?v=6"></script>
+  <script src="/app.js?v=7"></script>
 </body>
 </html>

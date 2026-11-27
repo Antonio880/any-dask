@@ -9,7 +9,7 @@ tags:
   - system-design
 ---
 
-# 🏗️ Arquitetura do Sistema
+# Arquitetura do Sistema
 
 Voltar para [[00-INDEX]] | Ver decisões em [[02-ADR-DECISIONS]] | Ver UI em [[04-UI-DESIGN-SYSTEM]]
 

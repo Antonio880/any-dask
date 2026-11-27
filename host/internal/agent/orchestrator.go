@@ -145,7 +145,7 @@ func (o *Orchestrator) runLoop(
 		sink("ai.status", protocol.AIStatusPayload{
 			TaskID:  taskID,
 			State:   "THINKING",
-			Message: "📸 Capturando tela...",
+			Message: "Capturando tela...",
 			Step:    step,
 			MaxStep: maxSteps,
 		})
@@ -166,7 +166,7 @@ func (o *Orchestrator) runLoop(
 		sink("ai.status", protocol.AIStatusPayload{
 			TaskID:  taskID,
 			State:   "THINKING",
-			Message: fmt.Sprintf("🧠 Pensando (%s)...", provider.Name()),
+			Message: fmt.Sprintf("Analisando (%s)...", provider.Name()),
 			Step:    step,
 			MaxStep: maxSteps,
 		})
