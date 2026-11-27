@@ -28,11 +28,11 @@ tags:
 
 ## 🎯 Estado Atual do Projeto
 
-- **Fase Atual:** `Fase 2 — MVP Funcional Validado (13ms @ 60fps no Android) + APK Nativo`
-- **Binário Windows 11:** `bin/anydask-host.exe` (`ddagrab` DXGI -> `h264_amf` hardware, `13ms · 60fps` reais no Android).
-- **Aplicativo Android Nativo:** `android/` em Kotlin (fullscreen imersivo, microfone nativo, rotação 1 toque, haptics) gerando `bin/anydask-android.apk` com download direto em `/download/anydask.apk`.
-- **Interação Mobile:** Toque Direto como padrão (clica no local exato tocado), Pinch-to-Zoom (`1x–4x`) + Pan livre, Long-Press = clique direito, botão `1x` / `2.2x` e `↻` Paisagem.
-- **IA Computer Use:** Chave Gemini default configurada em `~/.anydask/ai-config.json` usando `gemini-3-flash-preview` (validado 200 OK).
+- **Fase Atual:** `Fase 2 — Sistema Completo em Produção Pessoal (Windows 11 + macOS + Android APK v1.0.4)`
+- **Performance Validada ao Vivo:** `10–13ms · 60fps` reais em Windows 11 (`ddagrab → h264_amf`) e macOS (`avfoundation → h264_videotoolbox`) sobre Tailscale (`ICE-Lite`), com modo **`⚡Turbo`** (720p) e **Multi-Monitor** (`🖥 1/2`).
+- **Estética iOS 26 Liquid Glass Dual-Side:** Portal de conexão Liquid Glass, Bot Assistente com física de mola + Hold-to-Talk nativo (`v1.0.4`), Console ao Vivo da IA e Overlay nativo click-through na tela do PC/Mac acompanhando o monitor ativo.
+- **IA Computer Use:** `gemini-3.1-flash-lite` validado em `~1.4s/passo` com fallback automático multi-modelo + adapters Anthropic Claude e OpenAI/OpenRouter.
+- **Repositório:** `https://github.com/Antonio880/any-dask` (`branch main`, `README.md` 100% atualizado).
 
 ### Metas Não-Negociáveis (SLO / Qualidade)
 1. **Latência ponta-a-ponta (Glass-to-Glass):** `< 50ms` em rede local/fibra e `< 80ms` em 4G/5G estável.
@@ -49,7 +49,7 @@ Para manter continuidade total entre sessões de desenvolvimento:
 1. **Antes de qualquer tarefa:** Ler [[00-INDEX]] e [[03-BACKLOG-PROGRESS]] para alinhar estado e prioridades.
 2. **Antes de decisões técnicas relevantes:** Consultar [[02-ADR-DECISIONS]] e [[01-ARCHITECTURE]].
 3. **Antes de construir ou ajustar telas mobile:** Consultar [[04-UI-DESIGN-SYSTEM]].
-4. **Ao concluir qualquer módulo ou mudança relevante:** Atualizar automaticamente os status em [[03-BACKLOG-PROGRESS]], registrar novas decisões em [[02-ADR-DECISIONS]] e refletir mudanças estruturais em [[01-ARCHITECTURE]] e [[00-INDEX]].
+4. **Ao concluir qualquer módulo ou mudança relevante:** Atualizar automaticamente os status em [[03-BACKLOG-PROGRESS]], registrar novas decisões em [[02-ADR-DECISIONS]], refletir mudanças estruturais em [[01-ARCHITECTURE]] e [[00-INDEX]], e **manter o `README.md` na raiz sempre sincronizado com o passo a passo atualizado**.
 
 ---
 
