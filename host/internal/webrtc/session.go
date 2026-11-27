@@ -13,6 +13,7 @@ import (
 	"github.com/anydask/host/internal/capture"
 	"github.com/anydask/host/internal/input"
 	"github.com/anydask/host/internal/osctx"
+	"github.com/anydask/host/internal/overlay"
 	"github.com/anydask/host/internal/protocol"
 	"github.com/pion/webrtc/v4"
 )
@@ -21,14 +22,19 @@ type SessionManager struct {
 	streamer     *capture.Streamer
 	arbiter      *input.Arbiter
 	orchestrator *agent.Orchestrator
+	overlay      overlay.Overlay
 	fps          int
+
+	mu          sync.Mutex
+	activePeers int
 }
 
-func NewSessionManager(streamer *capture.Streamer, arbiter *input.Arbiter, orch *agent.Orchestrator, fps int) *SessionManager {
+func NewSessionManager(streamer *capture.Streamer, arbiter *input.Arbiter, orch *agent.Orchestrator, ov overlay.Overlay, fps int) *SessionManager {
 	return &SessionManager{
 		streamer:     streamer,
 		arbiter:      arbiter,
 		orchestrator: orch,
+		overlay:      ov,
 		fps:          fps,
 	}
 }
@@ -39,6 +45,7 @@ type PeerSession struct {
 	controlMu   sync.Mutex
 	unsubVideo  func()
 	closeOnce   sync.Once
+	countedPeer bool
 	mgr         *SessionManager
 }
 
@@ -93,10 +100,21 @@ func (m *SessionManager) CreateAnswer(offer webrtc.SessionDescription) (*PeerSes
 		return nil, webrtc.SessionDescription{}, err
 	}
 
-	if _, err := pc.AddTrack(videoTrack); err != nil {
+	rtpSender, err := pc.AddTrack(videoTrack)
+	if err != nil {
 		_ = pc.Close()
 		return nil, webrtc.SessionDescription{}, err
 	}
+
+	// Read incoming RTCP packets (PLI/NACK/REMB) so pion/webrtc interceptors never stall video delivery
+	go func() {
+		rtcpBuf := make([]byte, 1500)
+		for {
+			if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
+				return
+			}
+		}
+	}()
 
 	sess := &PeerSession{
 		PC:  pc,
@@ -112,6 +130,7 @@ func (m *SessionManager) CreateAnswer(offer webrtc.SessionDescription) (*PeerSes
 		switch state {
 		case webrtc.PeerConnectionStateConnected:
 			sess.startVideo(videoTrack)
+			sess.markConnected()
 		case webrtc.PeerConnectionStateDisconnected, webrtc.PeerConnectionStateFailed, webrtc.PeerConnectionStateClosed:
 			// Fail-closed safety: if the phone disconnects while AI is acting, abort AI immediately!
 			m.orchestrator.Abort(nil)
@@ -127,6 +146,12 @@ func (m *SessionManager) CreateAnswer(offer webrtc.SessionDescription) (*PeerSes
 				ev, err := protocol.DecodeBinaryInput(msg.Data)
 				if err != nil {
 					return
+				}
+				if m.overlay != nil && ev.Type == protocol.BinMouseButton &&
+					(ev.Action == protocol.MouseActionClick || ev.Action == protocol.MouseActionDblClick || ev.Action == protocol.MouseActionDown) &&
+					ev.XNorm != 0xFFFF && ev.YNorm != 0xFFFF {
+					rx, ry := m.arbiter.MapNormalized(ev.XNorm, ev.YNorm)
+					m.overlay.TriggerRipple(rx, ry, false)
 				}
 				_ = m.arbiter.HandleManualBinary(ev)
 			})
@@ -178,6 +203,18 @@ func (s *PeerSession) startVideo(track *webrtc.TrackLocalStaticSample) {
 	s.controlMu.Unlock()
 }
 
+func (s *PeerSession) markConnected() {
+	s.mgr.mu.Lock()
+	if !s.countedPeer {
+		s.countedPeer = true
+		s.mgr.activePeers++
+		if s.mgr.activePeers == 1 && s.mgr.overlay != nil {
+			s.mgr.overlay.SetState(overlay.StateConnected, "AnyDask · Conectado")
+		}
+	}
+	s.mgr.mu.Unlock()
+}
+
 func (s *PeerSession) Close() {
 	s.closeOnce.Do(func() {
 		s.controlMu.Lock()
@@ -187,6 +224,17 @@ func (s *PeerSession) Close() {
 		if unsub != nil {
 			unsub()
 		}
+		s.mgr.mu.Lock()
+		if s.countedPeer {
+			s.countedPeer = false
+			if s.mgr.activePeers > 0 {
+				s.mgr.activePeers--
+			}
+			if s.mgr.activePeers == 0 && s.mgr.overlay != nil {
+				s.mgr.overlay.SetState(overlay.StateHidden, "")
+			}
+		}
+		s.mgr.mu.Unlock()
 		_ = s.PC.Close()
 	})
 }
@@ -275,6 +323,13 @@ func (s *PeerSession) handleControlMessage(raw []byte) {
 		var p protocol.AIConfirmResponsePayload
 		if json.Unmarshal(msg.Payload, &p) == nil {
 			s.mgr.orchestrator.HandleConfirmResponse(p)
+		}
+
+	case "overlay.toggle":
+		if s.mgr.overlay != nil {
+			next := !s.mgr.overlay.IsEnabled()
+			s.mgr.overlay.SetEnabled(next)
+			s.SendControl("overlay.state", map[string]any{"enabled": next})
 		}
 	}
 }

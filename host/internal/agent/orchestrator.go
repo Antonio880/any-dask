@@ -15,6 +15,7 @@ import (
 	"github.com/anydask/host/internal/capture"
 	"github.com/anydask/host/internal/input"
 	"github.com/anydask/host/internal/osctx"
+	"github.com/anydask/host/internal/overlay"
 	"github.com/anydask/host/internal/protocol"
 )
 
@@ -26,15 +27,17 @@ type ProviderFactory func(req protocol.AIStartTaskPayload) (LLMProvider, error)
 type Orchestrator struct {
 	arbiter *input.Arbiter
 	factory ProviderFactory
+	overlay overlay.Overlay
 
 	mu          sync.Mutex
 	confirmWait map[string]chan bool
 }
 
-func NewOrchestrator(arbiter *input.Arbiter, factory ProviderFactory) *Orchestrator {
+func NewOrchestrator(arbiter *input.Arbiter, factory ProviderFactory, ov overlay.Overlay) *Orchestrator {
 	return &Orchestrator{
 		arbiter:     arbiter,
 		factory:     factory,
+		overlay:     ov,
 		confirmWait: make(map[string]chan bool),
 	}
 }
@@ -68,11 +71,16 @@ func (o *Orchestrator) Abort(sink EventSink) {
 	}
 	o.mu.Unlock()
 
-	if wasActive && sink != nil {
-		sink("ai.status", protocol.AIStatusPayload{
-			State:   "ABORTED",
-			Message: "Controle retomado pelo usuário",
-		})
+	if wasActive {
+		if o.overlay != nil {
+			o.overlay.SetState(overlay.StateConnected, "AnyDask · Conectado")
+		}
+		if sink != nil {
+			sink("ai.status", protocol.AIStatusPayload{
+				State:   "ABORTED",
+				Message: "Controle retomado pelo usuário",
+			})
+		}
 	}
 }
 
@@ -118,6 +126,11 @@ func (o *Orchestrator) runLoop(
 ) {
 	defer cancel()
 	defer o.arbiter.ReleaseAI(taskID)
+	defer func() {
+		if o.overlay != nil {
+			o.overlay.SetState(overlay.StateConnected, "AnyDask · Conectado")
+		}
+	}()
 
 	var history []StepRecord
 
@@ -126,6 +139,9 @@ func (o *Orchestrator) runLoop(
 			return
 		}
 
+		if o.overlay != nil {
+			o.overlay.SetState(overlay.StateAIThinking, "AnyDask AI · Analisando...")
+		}
 		sink("ai.status", protocol.AIStatusPayload{
 			TaskID:  taskID,
 			State:   "THINKING",
@@ -264,6 +280,9 @@ func (o *Orchestrator) runLoop(
 			preview.XNorm = rx
 			preview.YNorm = ry
 		}
+		if o.overlay != nil {
+			o.overlay.SetState(overlay.StateAIActing, "AnyDask AI · "+preview.Description)
+		}
 		sink("ai.status", protocol.AIStatusPayload{
 			TaskID:  taskID,
 			State:   "ACTING",
@@ -273,8 +292,12 @@ func (o *Orchestrator) runLoop(
 		})
 		sink("ai.step_preview", preview)
 
-		// Small visual lead-in so user sees the target halo before the click lands
+		// Small visual lead-in so user sees the target halo & liquid ripple before the click lands
 		if preview.HasPoint {
+			if o.overlay != nil {
+				sx, sy, _, _ := o.arbiter.MapImageCoords(act.X, act.Y, snap.Width, snap.Height)
+				o.overlay.TriggerRipple(sx, sy, true)
+			}
 			select {
 			case <-ctx.Done():
 				return

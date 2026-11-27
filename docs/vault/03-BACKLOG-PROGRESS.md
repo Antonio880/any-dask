@@ -41,9 +41,15 @@ Voltar para [[00-INDEX]] | Ver arquitetura em [[01-ARCHITECTURE]] | Ver design e
 - [x] **Acesso Remoto Externo (4G/5G):** Tailscale + `ICE-Lite` (`SetLite(true)`) + filtro de interfaces virtuais WSL/Hyper-V validado ao vivo pelo usuário
 - [x] **Bot Assistente Virtual Fluido:** Avatar animado com olhinhos expressivos (piscar natural + eye-tracking no arraste), física de mola 60fps com inclinação (`tilt`), animação de despertar ao tocar e Hero animado com onda sonora em `<canvas>`
 - [x] **Suporte macOS (Mac Mini):** Auto-detecção de índice de tela (`Capture screen 0`) + script `start-anydask-mac.sh` prontos
+- [x] **GitHub:** Publicado em `https://github.com/Antonio880/any-dask` (branch `main`, zero segredos expostos)
+- [x] **Fix Vídeo macOS (Anti-Freeze):** `-fflags nobuffer -flags low_delay -flush_packets 1`, CFR `fps=%s`, downscale Retina `min(1920,iw)`, `prio_speed` + `nv12` no `h264_videotoolbox`, RTP duration real pelo relógio monotônico, RTCP reader no `rtpSender` e `playoutDelayHint = 0` no cliente
+- [x] **iOS 26 Liquid Glass Dual-Side (Celular + Tela do PC/Mac):**
+  - [x] Overlay nativo click-through no **Windows 11** (`UpdateLayeredWindow` per-pixel alpha: borda líquida Apple Intelligence + Dynamic Island com waveform viva + Liquid Glass Ripples em cada clique)
+  - [x] Overlay nativo click-through no **macOS** (`NSWindow` + `NSVisualEffectView` blur real da Apple + borda líquida + Liquid Glass Ripples)
+  - [x] Upgrade **iOS 26 Liquid Glass** no App Mobile (moldura perimetral sincronizada, reflexo especular diagonal, touch ripples refrativos e botão `✨` na DevBar para ligar/desligar o vidro no PC/Mac)
 
 ### 🚧 In Progress
-- [ ] Publicação no GitHub e teste no Mac Mini
+- [ ] Validação ao vivo no Mac Mini (`git pull && ./start-anydask-mac.sh`) e no Windows 11
 
 ### 📌 Próximo Passo Imediato
 1. Rodar `bin\anydask-host.exe` neste Windows 11 para o usuário testar já no Android!

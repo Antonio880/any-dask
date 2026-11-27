@@ -16,13 +16,18 @@
   <!-- Fullscreen WebRTC Video Viewport -->
   <div id="stage" class="stage">
     <video id="remoteVideo" class="remote-video" autoplay playsinline muted></video>
+    <!-- iOS 26 Liquid Glass Perimeter Frame + Specular Glass Sheen -->
+    <div id="liquidEdgeGlow" class="liquid-edge-glow" aria-hidden="true"></div>
+    <div class="liquid-glass-sheen" aria-hidden="true"></div>
     <!-- Visual Click Halo Overlay when AI clicks on screen -->
     <div id="clickHalo" class="click-halo hidden" aria-hidden="true">
       <div class="click-halo-ring"></div>
       <div class="click-halo-dot"></div>
     </div>
-    <!-- Subtle Touch/Cursor Feedback -->
-    <div id="touchRipple" class="touch-ripple hidden" aria-hidden="true"></div>
+    <!-- Refractive Liquid Touch Ripple -->
+    <div id="touchRipple" class="touch-ripple hidden" aria-hidden="true">
+      <div class="touch-ripple-inner"></div>
+    </div>
   </div>
 
   <!-- Hidden Input to summon Android soft keyboard cleanly -->
@@ -199,6 +204,7 @@
         <button class="dev-key" data-text="~">~</button>
       </div>
       <div class="devbar-tools">
+        <button id="btnGlassToggle" class="tool-btn active" title="Ligar/Desligar Vidro Líquido na tela do computador">✨</button>
         <button id="btnZoomToggle" class="tool-btn" title="Zoom rápido / Resetar 1x">1x</button>
         <button id="btnRotate" class="tool-btn" title="Girar tela (Paisagem / Retrato)">↻</button>
         <button id="btnKeyboard" class="tool-btn" title="Teclado">⌨</button>

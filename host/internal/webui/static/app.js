@@ -19,6 +19,7 @@
   // DOM refs
   const stage = document.getElementById("stage");
   const video = document.getElementById("remoteVideo");
+  const liquidEdgeGlow = document.getElementById("liquidEdgeGlow");
   const clickHalo = document.getElementById("clickHalo");
   const touchRipple = document.getElementById("touchRipple");
   const hiddenKeyboard = document.getElementById("hiddenKeyboard");
@@ -57,6 +58,7 @@
   const btnInputMode = document.getElementById("btnInputMode");
   const btnZoomToggle = document.getElementById("btnZoomToggle");
   const btnRotate = document.getElementById("btnRotate");
+  const btnGlassToggle = document.getElementById("btnGlassToggle");
   const toastEl = document.getElementById("toast");
 
   // App state
@@ -183,6 +185,13 @@
       pc.addTransceiver("video", { direction: "recvonly" });
 
       pc.ontrack = (ev) => {
+        // Minimize WebRTC jitter buffer & playout delay so macOS & Windows frames render immediately without freezing
+        if (ev.receiver) {
+          try {
+            if ("playoutDelayHint" in ev.receiver) ev.receiver.playoutDelayHint = 0;
+            if ("jitterBufferTarget" in ev.receiver) ev.receiver.jitterBufferTarget = 0;
+          } catch {}
+        }
         if (ev.streams && ev.streams[0]) {
           video.srcObject = ev.streams[0];
         } else {
@@ -672,6 +681,13 @@
         }
         break;
       }
+      case "overlay.state": {
+        const enabled = !!msg.payload?.enabled;
+        if (btnGlassToggle) btnGlassToggle.classList.toggle("active", enabled);
+        if (liquidEdgeGlow) liquidEdgeGlow.style.opacity = enabled ? "1" : "0.15";
+        showToast(enabled ? "✨ Vidro Líquido ativado na tela do computador" : "Vidro Líquido pausado na tela do computador");
+        break;
+      }
       case "ai.confirm_required": {
         const p = msg.payload || {};
         pendingConfirm = p;
@@ -714,6 +730,7 @@
       const cls = state === "THINKING" ? "state-thinking" : "state-acting";
       aiOrb.classList.add(cls);
       if (botHero) botHero.classList.add(cls);
+      if (liquidEdgeGlow) liquidEdgeGlow.classList.add("ai-active");
       if (botHeroTitle) botHeroTitle.textContent = state === "THINKING" ? "Analisando tela..." : "Agindo no PC";
       if (botHeroSub) botHeroSub.textContent = message || "Executando sua instrução...";
       aiOverlay.classList.add("hidden"); // Free 92% of screen so user watches live!
@@ -723,6 +740,7 @@
     } else {
       aiOrb.classList.add("state-idle");
       if (botHero) botHero.classList.add("state-idle");
+      if (liquidEdgeGlow) liquidEdgeGlow.classList.remove("ai-active");
       if (botHeroTitle) botHeroTitle.textContent = "AnyDask AI";
       if (botHeroSub) botHeroSub.textContent = "Estou vendo sua tela. O que fazemos?";
       dynamicIsland.classList.add("hidden");
@@ -1099,6 +1117,13 @@
     updateInputModeUI();
     showToast(inputMode === "trackpad" ? "Modo Trackpad (cursor relativo)" : "Modo Toque Direto (clica onde você toca)");
   });
+
+  if (btnGlassToggle) {
+    btnGlassToggle.addEventListener("click", () => {
+      haptic(10);
+      sendControl("overlay.toggle", {});
+    });
+  }
 
   if (btnZoomToggle) {
     btnZoomToggle.addEventListener("click", () => {

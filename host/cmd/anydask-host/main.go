@@ -20,6 +20,7 @@ import (
 	"github.com/anydask/host/internal/agent/providers"
 	"github.com/anydask/host/internal/capture"
 	"github.com/anydask/host/internal/input"
+	"github.com/anydask/host/internal/overlay"
 	"github.com/anydask/host/internal/protocol"
 	hostrtc "github.com/anydask/host/internal/webrtc"
 	"github.com/anydask/host/internal/webui"
@@ -33,6 +34,7 @@ func main() {
 	encoder := flag.String("encoder", "", "Optional FFmpeg H.264 encoder override (e.g. h264_nvenc, h264_videotoolbox, libx264)")
 	ffmpegPath := flag.String("ffmpeg", "", "Optional full path to ffmpeg binary")
 	tokenFlag := flag.String("token", "", "Optional fixed auth token (auto-generated & persisted if omitted)")
+	noOverlay := flag.Bool("no-overlay", false, "Disable Liquid Glass desktop visual overlay")
 	flag.Parse()
 
 	token, err := loadOrCreateToken(*tokenFlag)
@@ -43,6 +45,8 @@ func main() {
 	injector := input.NewInjector()
 	bounds := injector.ScreenBounds()
 	arbiter := input.NewArbiter(injector)
+	desktopOverlay := overlay.New(!*noOverlay)
+	defer desktopOverlay.Close()
 
 	streamer := capture.NewStreamer(capture.Config{
 		Width:       bounds.Width,
@@ -66,8 +70,8 @@ func main() {
 		}
 	}
 
-	orchestrator := agent.NewOrchestrator(arbiter, providerFactory)
-	sessions := hostrtc.NewSessionManager(streamer, arbiter, orchestrator, *fps)
+	orchestrator := agent.NewOrchestrator(arbiter, providerFactory, desktopOverlay)
+	sessions := hostrtc.NewSessionManager(streamer, arbiter, orchestrator, desktopOverlay, *fps)
 
 	mux := http.NewServeMux()
 
@@ -163,9 +167,11 @@ func main() {
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	if err := srv.ListenAndServe(); err != nil {
-		log.Fatalf("server stopped: %v", err)
-	}
+	overlay.RunMainLoop(func() {
+		if err := srv.ListenAndServe(); err != nil {
+			log.Fatalf("server stopped: %v", err)
+		}
+	})
 }
 
 func withCORS(next http.HandlerFunc) http.HandlerFunc {

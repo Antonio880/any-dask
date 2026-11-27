@@ -194,20 +194,20 @@ func (s *Streamer) buildFFmpegArgs(fallbackCapture, fallbackEncoder bool) []stri
 	}
 
 	var args []string
-	args = append(args, "-hide_banner", "-loglevel", "error")
+	args = append(args, "-hide_banner", "-loglevel", "error", "-fflags", "nobuffer", "-flags", "low_delay")
 
 	pixFmt := "yuv420p"
-	if enc == "h264_amf" || enc == "h264_mf" || enc == "h264_qsv" {
+	if enc == "h264_amf" || enc == "h264_mf" || enc == "h264_qsv" || enc == "h264_videotoolbox" {
 		pixFmt = "nv12"
 	}
 
-	// 1. Input capture per OS
+	// 1. Input capture per OS (cap at 1920px wide so Mac Retina 4K/5K stays ultra-fast & Android MediaCodec compatible)
 	switch runtime.GOOS {
 	case "windows":
 		if !fallbackCapture && s.captureMode == "ddagrab" {
 			args = append(args,
 				"-init_hw_device", "d3d11va",
-				"-filter_complex", fmt.Sprintf("ddagrab=framerate=%s:draw_mouse=1,hwdownload,format=bgra,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=%s", fpsStr, pixFmt),
+				"-filter_complex", fmt.Sprintf("ddagrab=framerate=%s:draw_mouse=1,hwdownload,format=bgra,scale='min(1920,iw)':-2:flags=fast_bilinear,format=%s", fpsStr, pixFmt),
 			)
 		} else {
 			args = append(args,
@@ -215,7 +215,7 @@ func (s *Streamer) buildFFmpegArgs(fallbackCapture, fallbackEncoder bool) []stri
 				"-framerate", fpsStr,
 				"-draw_mouse", "1",
 				"-i", "desktop",
-				"-vf", fmt.Sprintf("scale=trunc(iw/2)*2:trunc(ih/2)*2,format=%s", pixFmt),
+				"-vf", fmt.Sprintf("scale='min(1920,iw)':-2:flags=fast_bilinear,format=%s", pixFmt),
 			)
 		}
 	case "darwin":
@@ -225,14 +225,15 @@ func (s *Streamer) buildFFmpegArgs(fallbackCapture, fallbackEncoder bool) []stri
 			"-framerate", fpsStr,
 			"-capture_cursor", "1",
 			"-i", screenIdx+":none",
-			"-vf", fmt.Sprintf("scale=trunc(iw/2)*2:trunc(ih/2)*2,format=%s", pixFmt),
+			// Force steady CFR output + cap Retina 4K/5K down to <=1080p so Android never freezes
+			"-vf", fmt.Sprintf("fps=%s,scale='min(1920,iw)':-2:flags=fast_bilinear,format=%s", fpsStr, pixFmt),
 		)
 	default:
 		args = append(args,
 			"-f", "x11grab",
 			"-framerate", fpsStr,
 			"-i", ":0.0",
-			"-vf", fmt.Sprintf("scale=trunc(iw/2)*2:trunc(ih/2)*2,format=%s", pixFmt),
+			"-vf", fmt.Sprintf("scale='min(1920,iw)':-2:flags=fast_bilinear,format=%s", pixFmt),
 		)
 	}
 
@@ -288,6 +289,7 @@ func (s *Streamer) buildFFmpegArgs(fallbackCapture, fallbackEncoder bool) []stri
 		args = append(args,
 			"-c:v", "h264_videotoolbox",
 			"-realtime", "true",
+			"-prio_speed", "true",
 			"-profile:v", "baseline",
 			"-allow_sw", "1",
 			"-bf", "0",
@@ -314,6 +316,7 @@ func (s *Streamer) buildFFmpegArgs(fallbackCapture, fallbackEncoder bool) []stri
 
 	args = append(args,
 		"-bsf:v", "dump_extra",
+		"-flush_packets", "1",
 		"-f", "h264",
 		"pipe:1",
 	)
@@ -322,12 +325,14 @@ func (s *Streamer) buildFFmpegArgs(fallbackCapture, fallbackEncoder bool) []stri
 
 // parseAnnexB splits raw H.264 Annex-B stream into Access Units and writes them to all subscribers.
 func (s *Streamer) parseAnnexB(ctx context.Context, r io.Reader, frameDur time.Duration) error {
-	br := bufio.NewReaderSize(r, 256*1024)
+	br := bufio.NewReaderSize(r, 64*1024)
 	buf := make([]byte, 0, 512*1024)
-	tmp := make([]byte, 64*1024)
+	tmp := make([]byte, 32*1024)
 
 	var au bytes.Buffer
 	hasVCL := false
+	lastSampleAt := time.Now()
+	frameCount := 0
 
 	flushAU := func() {
 		if au.Len() == 0 {
@@ -338,9 +343,23 @@ func (s *Streamer) parseAnnexB(ctx context.Context, r io.Reader, frameDur time.D
 		au.Reset()
 		hasVCL = false
 
+		now := time.Now()
+		dt := now.Sub(lastSampleAt)
+		lastSampleAt = now
+		if dt < 5*time.Millisecond {
+			dt = frameDur
+		} else if dt > 250*time.Millisecond {
+			dt = 250 * time.Millisecond
+		}
+
+		frameCount++
+		if frameCount == 1 || frameCount == 60 {
+			log.Printf("[capture] streaming active (%s + %s): %d frames sent", s.captureMode, s.encoderName, frameCount)
+		}
+
 		sample := media.Sample{
 			Data:     data,
-			Duration: frameDur,
+			Duration: dt,
 		}
 		s.broadcast(sample)
 	}
