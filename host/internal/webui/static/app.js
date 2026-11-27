@@ -1134,12 +1134,13 @@
   function updateDisplayButton() {
     if (!btnDisplaySwitch) return;
     const list = hostInfo.displays || [];
+    const idx = hostInfo.active_display || 0;
     if (list.length > 1) {
-      const idx = hostInfo.active_display || 0;
       btnDisplaySwitch.textContent = `🖥 ${idx + 1}/${list.length}`;
-      btnDisplaySwitch.classList.remove("hidden");
+      btnDisplaySwitch.classList.add("active");
     } else {
-      btnDisplaySwitch.classList.add("hidden");
+      btnDisplaySwitch.textContent = `🖥 1`;
+      btnDisplaySwitch.classList.remove("active");
     }
   }
 
@@ -1147,7 +1148,10 @@
     btnDisplaySwitch.addEventListener("click", () => {
       haptic(12);
       const list = hostInfo.displays || [];
-      if (list.length <= 1) return;
+      if (list.length <= 1) {
+        showToast("Apenas 1 monitor detectado neste host");
+        return;
+      }
       const nextIdx = ((hostInfo.active_display || 0) + 1) % list.length;
       const target = list[nextIdx];
       sendControl("display.switch", { index: nextIdx });

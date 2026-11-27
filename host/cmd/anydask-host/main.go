@@ -75,9 +75,13 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// Static PWA Apple Glass UI
+	// Static PWA Apple Glass UI (no-cache so Android WebView always gets the latest UI immediately)
 	fileServer := http.FileServer(http.FS(webui.StaticFS()))
-	mux.Handle("/", fileServer)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+		w.Header().Set("Pragma", "no-cache")
+		fileServer.ServeHTTP(w, r)
+	})
 
 	// Health / Host Discovery endpoint (used by Android Host Switcher)
 	mux.HandleFunc("/api/health", withCORS(func(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +164,7 @@ func main() {
 		writeJSON(w, http.StatusOK, answer)
 	}))
 
-	printBanner(*addr, token, bounds, *fps, streamer.CaptureMode(), streamer.EncoderName())
+	printBanner(*addr, token, bounds, injector.Displays(), *fps, streamer.CaptureMode(), streamer.EncoderName())
 
 	srv := &http.Server{
 		Addr:              *addr,
@@ -265,7 +269,7 @@ func randomToken() string {
 	return hex.EncodeToString(b)
 }
 
-func printBanner(addr, token string, bounds input.ScreenBounds, fps int, capMode, encoder string) {
+func printBanner(addr, token string, bounds input.ScreenBounds, displays []protocol.DisplayInfo, fps int, capMode, encoder string) {
 	port := strings.TrimPrefix(addr, ":")
 	if strings.Contains(addr, ":") {
 		parts := strings.Split(addr, ":")
@@ -274,7 +278,10 @@ func printBanner(addr, token string, bounds input.ScreenBounds, fps int, capMode
 	host, _ := os.Hostname()
 	fmt.Println("================================================================")
 	fmt.Printf("  AnyDask Host Agent (%s | %s/%s)\n", host, runtime.GOOS, runtime.GOARCH)
-	fmt.Printf("  Display : %dx%d @ %d FPS\n", bounds.Width, bounds.Height, fps)
+	fmt.Printf("  Display : %dx%d @ %d FPS (%d monitor(es) detectado(s))\n", bounds.Width, bounds.Height, fps, len(displays))
+	for _, d := range displays {
+		fmt.Printf("            [%d] %s @ (%d,%d)\n", d.Index, d.Name, d.X, d.Y)
+	}
 	fmt.Printf("  Video   : %s -> %s (H.264 Ultra-Low Latency)\n", capMode, encoder)
 	fmt.Printf("  Token   : %s\n", token)
 	fmt.Println("----------------------------------------------------------------")
