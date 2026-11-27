@@ -50,9 +50,12 @@ Voltar para [[00-INDEX]] | Ver arquitetura em [[01-ARCHITECTURE]] | Ver design e
 - [x] **Multi-Monitor Nativo (macOS + Windows 11) + Modo Turbo Ultra-Latência:**
   - [x] Descoberta de todos os monitores (`CGGetActiveDisplayList` no macOS / `EnumDisplayMonitors` no Windows) + troca ao vivo sem desconectar (`🖥 1/2` na DevBar) + mapeamento exato de coordenadas de toque e Computer Use no monitor selecionado
   - [x] Redução agressiva de latência: leitura direta do pipe sem `bufio`, `-probesize 32 -analyzeduration 0`, `-pixel_format nv12` nativo no `avfoundation` do Mac, clique reduzido de `12ms` → `4ms`, clear parcial de memória no overlay Windows, e botão **`HD` / `⚡Turbo` (720p@60fps)** em 1 toque
+- [x] **Portal Liquid Glass de Conexão & Fix WebView Android (`v1.0.3`):**
+  - [x] Tela de conexão Apple Liquid Glass com Bot animado + anéis orbitais + stepper (`Sinal -> Túnel P2P -> 60 FPS`) e vídeo oculto até o 1º frame real decodificado
+  - [x] `MainActivity.kt` sobrescrevendo `getDefaultVideoPoster()` (elimina o ícone cinza ▶ esticado do Android WebView) + `LOAD_NO_CACHE` + `clearCache(true)` (resolve cache preso de UI antiga)
 
 ### 🚧 In Progress
-- [ ] Validação do multi-monitor e modo Turbo no Mac Mini (`git pull && ./start-anydask-mac.sh`) e Windows 11
+- [ ] Atualização final no celular (`v1.0.3`) + PC/Mac para validar o portal de conexão e o botão `🖥 1/2` ao vivo
 
 ### 📌 Próximo Passo Imediato
 1. Rodar `bin\anydask-host.exe` neste Windows 11 para o usuário testar já no Android!

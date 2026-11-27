@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -67,6 +68,7 @@ class MainActivity : AppCompatActivity() {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
+                cacheMode = WebSettings.LOAD_NO_CACHE
                 mediaPlaybackRequiresUserGesture = false
                 allowFileAccess = true
                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
@@ -77,6 +79,7 @@ class MainActivity : AppCompatActivity() {
                 displayZoomControls = false
             }
 
+            clearCache(true)
             addJavascriptInterface(NativeBridge(), "AnyDaskNative")
 
             webViewClient = object : WebViewClient() {
@@ -106,6 +109,11 @@ class MainActivity : AppCompatActivity() {
             }
 
             webChromeClient = object : WebChromeClient() {
+                override fun getDefaultVideoPoster(): Bitmap {
+                    // Replace Android WebView's ugly default gray play icon with a 1x1 transparent bitmap
+                    return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+                }
+
                 override fun onPermissionRequest(request: PermissionRequest?) {
                     runOnUiThread {
                         request?.grant(request.resources)

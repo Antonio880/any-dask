@@ -166,7 +166,13 @@ html, body {
   background: #000;
   pointer-events: none;
   transform-origin: center center;
-  will-change: transform;
+  will-change: transform, opacity;
+  opacity: 1;
+  transition: opacity 0.35s var(--spring);
+}
+
+.remote-video.is-loading {
+  opacity: 0;
 }
 
 .hidden-keyboard {
@@ -844,38 +850,176 @@ html, body {
 .connect-overlay, .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.56);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: radial-gradient(circle at 50% 35%, rgba(28, 28, 56, 0.92), rgba(4, 5, 10, 0.98) 70%);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 18px;
   z-index: 80;
+  overflow: hidden;
+}
+
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.56);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.connect-ambient {
+  position: absolute;
+  width: 460px;
+  height: 460px;
+  border-radius: 999px;
+  background: conic-gradient(from 0deg, rgba(100, 210, 255, 0.24), rgba(94, 92, 230, 0.28), rgba(191, 90, 242, 0.26), rgba(48, 209, 88, 0.16), rgba(100, 210, 255, 0.24));
+  filter: blur(78px);
+  animation: orbSpin 12s linear infinite;
+  pointer-events: none;
 }
 
 .glass-card {
-  border-radius: 26px;
-  padding: 20px;
-  width: min(94vw, 430px);
+  border-radius: 30px;
+  padding: 24px 22px;
+  width: min(92vw, 410px);
   max-height: 88dvh;
   overflow-y: auto;
+  position: relative;
+  z-index: 2;
 }
 
 .connect-card {
-  background: var(--glass-thick);
-  border: 1px solid var(--border-highlight);
   text-align: center;
+  animation: sheetPop 0.45s cubic-bezier(0.34, 1.35, 0.64, 1);
 }
-.connect-card h1 { margin: 10px 0 4px; font-size: 22px; letter-spacing: -0.02em; }
+.connect-card h1 {
+  margin: 8px 0 4px;
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  background: linear-gradient(120deg, #FFFFFF 10%, #A9EDFF 55%, #DDB3FF 95%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 
-.brand-orb-mini {
-  width: 44px;
-  height: 44px;
-  margin: 0 auto;
+@keyframes sheetPop {
+  from { transform: scale(0.9) translateY(16px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.connect-portal {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  margin: 4px auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portal-glow {
+  position: absolute;
+  inset: 10px;
   border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, #fff, var(--orb-c) 30%, var(--orb-a) 70%, var(--orb-b));
-  box-shadow: 0 0 28px rgba(94, 92, 230, 0.7);
+  background: conic-gradient(from 0deg, var(--orb-c), var(--orb-a), var(--orb-b), var(--orb-c));
+  filter: blur(22px);
+  opacity: 0.65;
+  animation: orbSpin 4s linear infinite;
+}
+
+.portal-ring {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.portal-ring-outer {
+  inset: 0;
+  border: 1.5px solid transparent;
+  background: linear-gradient(135deg, rgba(100, 210, 255, 0.72), rgba(191, 90, 242, 0.12), rgba(255, 255, 255, 0.55)) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: orbSpin 5.5s linear infinite;
+}
+
+.portal-ring-inner {
+  inset: 12px;
+  border: 1.2px solid transparent;
+  background: linear-gradient(225deg, rgba(191, 90, 242, 0.75), rgba(100, 210, 255, 0.15), rgba(100, 210, 255, 0.68)) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: orbSpin 3.6s linear infinite reverse;
+}
+
+.portal-bot {
+  position: relative;
+  z-index: 2;
+  animation: botFloat 2.8s ease-in-out infinite;
+  filter: drop-shadow(0 10px 22px rgba(94, 92, 230, 0.48));
+}
+
+.portal-eyes-scan {
+  animation: eyeScan 1.8s ease-in-out infinite alternate;
+}
+
+.connect-brand-pill {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: rgba(164, 234, 255, 0.9);
+  background: rgba(100, 210, 255, 0.12);
+  border: 1px solid rgba(100, 210, 255, 0.28);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.connect-status {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 4px 0 14px;
+  min-height: 18px;
+}
+
+.connect-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 6px;
+}
+
+.cstep {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  transition: all 0.3s var(--spring);
+}
+
+.cstep.active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(100, 210, 255, 0.25), rgba(94, 92, 230, 0.36));
+  border-color: rgba(126, 232, 255, 0.55);
+  box-shadow: 0 0 14px rgba(100, 210, 255, 0.3);
+}
+
+.cstep.done {
+  color: #79F2A1;
+  background: rgba(48, 209, 88, 0.16);
+  border-color: rgba(48, 209, 88, 0.42);
+}
+
+.cstep-line {
+  width: 14px;
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 99px;
 }
 
 .sheet-header {

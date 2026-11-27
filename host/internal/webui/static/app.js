@@ -29,6 +29,39 @@
   const connectForm = document.getElementById("connectForm");
   const connectUrlInput = document.getElementById("connectUrlInput");
   const connectTokenInput = document.getElementById("connectTokenInput");
+  const cstepSignal = document.getElementById("cstepSignal");
+  const cstepIce = document.getElementById("cstepIce");
+  const cstepVideo = document.getElementById("cstepVideo");
+
+  function setConnectStep(step) {
+    // step: "signal" | "ice" | "video" | "ready"
+    const all = [cstepSignal, cstepIce, cstepVideo];
+    all.forEach((el) => el && el.classList.remove("active", "done"));
+    if (step === "signal") {
+      if (cstepSignal) cstepSignal.classList.add("active");
+    } else if (step === "ice") {
+      if (cstepSignal) cstepSignal.classList.add("done");
+      if (cstepIce) cstepIce.classList.add("active");
+    } else if (step === "video") {
+      if (cstepSignal) cstepSignal.classList.add("done");
+      if (cstepIce) cstepIce.classList.add("done");
+      if (cstepVideo) cstepVideo.classList.add("active");
+    } else if (step === "ready") {
+      all.forEach((el) => el && el.classList.add("done"));
+    }
+  }
+
+  // Reveal the <video> ONLY after real decoded frames arrive (kills Android WebView's ugly gray play icon!)
+  function revealVideoWhenReady() {
+    if (video.videoWidth > 0 && video.videoHeight > 0) {
+      video.classList.remove("is-loading");
+      setConnectStep("ready");
+      connectOverlay.classList.add("hidden");
+    }
+  }
+  video.addEventListener("loadeddata", revealVideoWhenReady);
+  video.addEventListener("playing", revealVideoWhenReady);
+  video.addEventListener("resize", revealVideoWhenReady);
 
   const dynamicIsland = document.getElementById("dynamicIsland");
   const islandTitle = document.getElementById("islandTitle");
@@ -177,7 +210,9 @@
     baseUrl = baseUrl.replace(/\/+$/, "");
     currentHost = { url: baseUrl, token, name: label || baseUrl };
 
+    video.classList.add("is-loading");
     connectOverlay.classList.remove("hidden");
+    setConnectStep("signal");
     connectStatusText.textContent = `Conectando em ${currentHost.name}...`;
     connectForm.classList.add("hidden");
 
@@ -201,14 +236,17 @@
           const ms = new MediaStream([ev.track]);
           video.srcObject = ms;
         }
+        setConnectStep("video");
+        connectStatusText.textContent = `Sincronizando vídeo 60fps...`;
         video.play().catch(() => {});
-        connectOverlay.classList.add("hidden");
+        revealVideoWhenReady();
       };
 
       pc.oniceconnectionstatechange = () => {
         if (!pc) return;
         const ist = pc.iceConnectionState;
         if (ist === "checking") {
+          setConnectStep("ice");
           connectStatusText.textContent = `Fechando túnel WebRTC com ${currentHost.name}...`;
         } else if (ist === "failed") {
           connectStatusText.textContent = `Falha no túnel WebRTC (${currentHost.name}). Verifique se o Tailscale está ativo.`;
@@ -222,7 +260,8 @@
         if (!pc) return;
         const st = pc.connectionState;
         if (st === "connected") {
-          connectStatusText.textContent = `Conectado! Aguardando primeiro frame de vídeo...`;
+          setConnectStep("video");
+          connectStatusText.textContent = `Conectado! Carregando primeiro frame...`;
           showToast(`Conectado a ${currentHost.name}`);
         } else if (st === "failed" || st === "disconnected") {
           hudMiniStats.textContent = "offline";

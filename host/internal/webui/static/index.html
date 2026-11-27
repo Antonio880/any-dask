@@ -10,12 +10,12 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   <title>AnyDask Remote + AI</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css?v=5" />
 </head>
 <body>
   <!-- Fullscreen WebRTC Video Viewport -->
   <div id="stage" class="stage">
-    <video id="remoteVideo" class="remote-video" autoplay playsinline muted></video>
+    <video id="remoteVideo" class="remote-video is-loading" autoplay playsinline muted poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect width='1' height='1' fill='%23000000'/%3E%3C/svg%3E"></video>
     <!-- iOS 26 Liquid Glass Perimeter Frame + Specular Glass Sheen -->
     <div id="liquidEdgeGlow" class="liquid-edge-glow" aria-hidden="true"></div>
     <div class="liquid-glass-sheen" aria-hidden="true"></div>
@@ -33,12 +33,47 @@
   <!-- Hidden Input to summon Android soft keyboard cleanly -->
   <textarea id="hiddenKeyboard" class="hidden-keyboard" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
 
-  <!-- Connection / Empty State Overlay -->
+  <!-- iOS 26 Liquid Glass Connecting Portal (replaces Android WebView blank/play state) -->
   <div id="connectOverlay" class="connect-overlay">
-    <div class="glass-card connect-card">
-      <div class="brand-orb-mini"></div>
+    <div class="connect-ambient" aria-hidden="true"></div>
+    <div class="glass-card glass-regular connect-card">
+      <div class="connect-portal">
+        <span class="portal-ring portal-ring-outer"></span>
+        <span class="portal-ring portal-ring-inner"></span>
+        <span class="portal-glow"></span>
+        <svg class="portal-bot" viewBox="0 0 80 80" width="58" height="58" aria-hidden="true">
+          <defs>
+            <linearGradient id="connBodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#272B44" />
+              <stop offset="100%" stop-color="#0B0D16" />
+            </linearGradient>
+            <linearGradient id="connEyeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FFFFFF" />
+              <stop offset="50%" stop-color="#64D2FF" />
+              <stop offset="100%" stop-color="#BF5AF2" />
+            </linearGradient>
+          </defs>
+          <line x1="40" y1="8" x2="40" y2="16" stroke="rgba(126,232,255,0.75)" stroke-width="2.5" stroke-linecap="round" />
+          <circle class="bot-antenna-tip" cx="40" cy="7" r="3.5" fill="#64D2FF" />
+          <rect x="10" y="16" width="60" height="48" rx="22" fill="url(#connBodyGrad)" stroke="rgba(255,255,255,0.34)" stroke-width="1.8" />
+          <rect x="16" y="23" width="48" height="34" rx="16" fill="#05070F" stroke="rgba(100,210,255,0.28)" stroke-width="1.2" />
+          <g class="bot-eyes portal-eyes-scan">
+            <rect class="bot-eye" x="27" y="32" width="8.5" height="14" rx="4.25" fill="url(#connEyeGrad)" />
+            <rect class="bot-eye" x="44.5" y="32" width="8.5" height="14" rx="4.25" fill="url(#connEyeGrad)" />
+          </g>
+          <path d="M33 50 Q40 54.5 47 50" fill="none" stroke="rgba(100,210,255,0.85)" stroke-width="2.2" stroke-linecap="round" />
+        </svg>
+      </div>
+      <div class="connect-brand-pill">LIQUID GLASS REMOTE</div>
       <h1>AnyDask</h1>
-      <p id="connectStatusText" class="muted">Conectando ao host remoto...</p>
+      <p id="connectStatusText" class="connect-status">Estabelecendo túnel seguro...</p>
+      <div class="connect-steps" id="connectSteps">
+        <span class="cstep active" id="cstepSignal">Sinal</span>
+        <span class="cstep-line"></span>
+        <span class="cstep" id="cstepIce">Túnel P2P</span>
+        <span class="cstep-line"></span>
+        <span class="cstep" id="cstepVideo">60 FPS</span>
+      </div>
       <div id="connectForm" class="connect-form hidden">
         <label class="field-label">Endereço do Host (Tailscale ou LAN)</label>
         <input id="connectUrlInput" type="text" class="glass-input" placeholder="http://100.x.y.z:8787" />
@@ -279,6 +314,6 @@
   <!-- Toast feedback -->
   <div id="toast" class="toast glass-thin hidden"></div>
 
-  <script src="/app.js"></script>
+  <script src="/app.js?v=5"></script>
 </body>
 </html>
