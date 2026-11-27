@@ -27,6 +27,8 @@ typedef struct {
 
 static MacRipple gRipples[12];
 static int gRippleCount = 0;
+static CGFloat gOriginX = 0.0;
+static CGFloat gOriginY = 0.0;
 
 @implementation AnyDaskLiquidView
 
@@ -119,9 +121,9 @@ static int gRippleCount = 0;
         CGFloat outerR = 12.0 + ease * 68.0;
         CGFloat innerR = 6.0 + ease * 42.0;
 
-        // macOS Cocoa origin is bottom-left; convert from top-left screen coordinates
-        CGFloat cy = b.size.height - rp.y;
-        CGFloat cx = rp.x;
+        // Convert global CoreGraphics top-left (rp.x, rp.y) into local Cocoa bottom-left view coords
+        CGFloat cx = rp.x - gOriginX;
+        CGFloat cy = b.size.height - (rp.y - gOriginY);
 
         CGContextSaveGState(ctx);
         NSColor *ringColor = rp.isAI
@@ -203,6 +205,36 @@ static void macOverlaySetState(int mode, const char *label) {
             [gOverlayWin orderFrontRegardless];
             [gLiquidView setNeedsDisplay:YES];
         }
+    });
+}
+
+static void macOverlaySetBounds(int displayIndex, int x, int y, int w, int h) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!gOverlayWin || !gLiquidView) return;
+        gOriginX = (CGFloat)x;
+        gOriginY = (CGFloat)y;
+
+        // CoreGraphics uses top-left origin of primary display (screens[0]); Cocoa uses bottom-left of primary display.
+        NSArray<NSScreen *> *screens = [NSScreen screens];
+        NSRect targetFrame = NSMakeRect(0, 0, w > 0 ? w : 1920, h > 0 ? h : 1080);
+        if (screens.count > 0) {
+            CGFloat primaryH = screens[0].frame.size.height;
+            CGFloat cocoaY = primaryH - ((CGFloat)y + (CGFloat)h);
+            targetFrame = NSMakeRect((CGFloat)x, cocoaY, (CGFloat)w, (CGFloat)h);
+        }
+
+        [gOverlayWin setFrame:targetFrame display:YES];
+        NSRect localBounds = NSMakeRect(0, 0, targetFrame.size.width, targetFrame.size.height);
+        [gLiquidView setFrame:localBounds];
+
+        // Reposition the Liquid Glass Dynamic Island at the top center of the newly selected monitor
+        CGFloat pillW = gLiquidView.islandView.frame.size.width;
+        CGFloat pillH = gLiquidView.islandView.frame.size.height;
+        gLiquidView.islandView.frame = NSMakeRect((localBounds.size.width - pillW) / 2.0,
+                                                  localBounds.size.height - pillH - 14.0,
+                                                  pillW, pillH);
+        gRippleCount = 0;
+        [gLiquidView setNeedsDisplay:YES];
     });
 }
 
@@ -293,6 +325,13 @@ func (o *darwinOverlay) apply(enabled bool, state State, label string) {
 	cStr := C.CString(label)
 	defer C.free(unsafe.Pointer(cStr))
 	C.macOverlaySetState(C.int(mode), cStr)
+}
+
+func (o *darwinOverlay) SetBounds(displayIndex, x, y, w, h int) {
+	if w <= 0 || h <= 0 {
+		return
+	}
+	C.macOverlaySetBounds(C.int(displayIndex), C.int(x), C.int(y), C.int(w), C.int(h))
 }
 
 func (o *darwinOverlay) TriggerRipple(x, y int, isAI bool) {

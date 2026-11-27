@@ -19,6 +19,7 @@ var (
 	pCreateWindowExW     = u32.NewProc("CreateWindowExW")
 	pDefWindowProcW      = u32.NewProc("DefWindowProcW")
 	pShowWindow          = u32.NewProc("ShowWindow")
+	pSetWindowPos        = u32.NewProc("SetWindowPos")
 	pUpdateLayeredWindow = u32.NewProc("UpdateLayeredWindow")
 	pPeekMessageW        = u32.NewProc("PeekMessageW")
 	pTranslateMessage    = u32.NewProc("TranslateMessage")
@@ -108,13 +109,18 @@ type ripple struct {
 }
 
 type winOverlay struct {
-	mu      sync.Mutex
-	enabled bool
-	state   State
-	label   string
-	ripples []ripple
-	stopCh  chan struct{}
-	closed  bool
+	mu            sync.Mutex
+	enabled       bool
+	state         State
+	label         string
+	originX       int
+	originY       int
+	targetW       int
+	targetH       int
+	boundsChanged bool
+	ripples       []ripple
+	stopCh        chan struct{}
+	closed        bool
 }
 
 // RunMainLoop simply invokes serverFn on Windows (the Win32 overlay runs on its own locked UI goroutine).
@@ -151,9 +157,27 @@ func (o *winOverlay) SetState(state State, label string) {
 	o.mu.Unlock()
 }
 
+func (o *winOverlay) SetBounds(displayIndex, x, y, w, h int) {
+	if w <= 0 || h <= 0 {
+		return
+	}
+	o.mu.Lock()
+	if o.originX != x || o.originY != y || o.targetW != w || o.targetH != h {
+		o.originX = x
+		o.originY = y
+		o.targetW = w
+		o.targetH = h
+		o.boundsChanged = true
+		o.ripples = nil
+	}
+	o.mu.Unlock()
+}
+
 func (o *winOverlay) TriggerRipple(x, y int, isAI bool) {
 	o.mu.Lock()
-	o.ripples = append(o.ripples, ripple{x: x, y: y, start: time.Now(), isAI: isAI})
+	lx := x - o.originX
+	ly := y - o.originY
+	o.ripples = append(o.ripples, ripple{x: lx, y: ly, start: time.Now(), isAI: isAI})
 	if len(o.ripples) > 10 {
 		o.ripples = o.ripples[len(o.ripples)-10:]
 	}
@@ -216,30 +240,56 @@ func (o *winOverlay) uiThread() {
 	hdcMem, _, _ := pCreateCompatDC.Call(hdcScreen)
 	defer pDeleteDC.Call(hdcMem)
 
-	var bmi bitmapInfoHeader
-	bmi.biSize = uint32(unsafe.Sizeof(bmi))
-	bmi.biWidth = int32(w)
-	bmi.biHeight = -int32(h) // top-down
-	bmi.biPlanes = 1
-	bmi.biBitCount = 32
-	bmi.biCompression = biRGB
+	curX, curY := 0, 0
+	var hBmp uintptr
+	var oldBmp uintptr
+	var buf []byte
 
-	var bits unsafe.Pointer
-	hBmp, _, _ := pCreateDIBSection.Call(
-		hdcScreen,
-		uintptr(unsafe.Pointer(&bmi)),
-		dibRGBColors,
-		uintptr(unsafe.Pointer(&bits)),
-		0, 0,
-	)
-	if hBmp == 0 || bits == nil {
+	allocDIB := func(dw, dh int) bool {
+		if oldBmp != 0 {
+			pSelectObject.Call(hdcMem, oldBmp)
+			oldBmp = 0
+		}
+		if hBmp != 0 {
+			pDeleteObject.Call(hBmp)
+			hBmp = 0
+		}
+		var bmi bitmapInfoHeader
+		bmi.biSize = uint32(unsafe.Sizeof(bmi))
+		bmi.biWidth = int32(dw)
+		bmi.biHeight = -int32(dh) // top-down
+		bmi.biPlanes = 1
+		bmi.biBitCount = 32
+		bmi.biCompression = biRGB
+
+		var bits unsafe.Pointer
+		hb, _, _ := pCreateDIBSection.Call(
+			hdcScreen,
+			uintptr(unsafe.Pointer(&bmi)),
+			dibRGBColors,
+			uintptr(unsafe.Pointer(&bits)),
+			0, 0,
+		)
+		if hb == 0 || bits == nil {
+			return false
+		}
+		hBmp = hb
+		oldBmp, _, _ = pSelectObject.Call(hdcMem, hBmp)
+		buf = unsafe.Slice((*byte)(bits), dw*dh*4)
+		return true
+	}
+
+	if !allocDIB(w, h) {
 		return
 	}
-	defer pDeleteObject.Call(hBmp)
-	oldBmp, _, _ := pSelectObject.Call(hdcMem, hBmp)
-	defer pSelectObject.Call(hdcMem, oldBmp)
-
-	buf := unsafe.Slice((*byte)(bits), w*h*4)
+	defer func() {
+		if oldBmp != 0 {
+			pSelectObject.Call(hdcMem, oldBmp)
+		}
+		if hBmp != 0 {
+			pDeleteObject.Call(hBmp)
+		}
+	}()
 
 	visible := false
 	hadRipples := false
@@ -267,6 +317,9 @@ func (o *winOverlay) uiThread() {
 		o.mu.Lock()
 		active := o.enabled && o.state != StateHidden
 		st := o.state
+		bChanged := o.boundsChanged
+		nx, ny, nw, nh := o.originX, o.originY, o.targetW, o.targetH
+		o.boundsChanged = false
 		now := time.Now()
 		liveRipples := o.ripples[:0]
 		for _, rp := range o.ripples {
@@ -277,6 +330,20 @@ func (o *winOverlay) uiThread() {
 		o.ripples = liveRipples
 		ripplesCopy := append([]ripple(nil), liveRipples...)
 		o.mu.Unlock()
+
+		if bChanged && nw > 0 && nh > 0 {
+			curX, curY = nx, ny
+			if nw != w || nh != h {
+				w, h = nw, nh
+				if !allocDIB(w, h) {
+					return
+				}
+			} else {
+				clear(buf)
+			}
+			// HWND_TOPMOST = ^uintptr(0), SWP_NOACTIVATE = 0x0010
+			pSetWindowPos.Call(hwnd, ^uintptr(0), uintptr(curX), uintptr(curY), uintptr(w), uintptr(h), 0x0010)
+		}
 
 		if !active {
 			if visible {
@@ -306,7 +373,7 @@ func (o *winOverlay) uiThread() {
 		renderLiquidGlass(buf, w, h, phase, intensity, borderDepth, st, ripplesCopy, needFullClear, now)
 
 		ptSrc := point{0, 0}
-		ptDst := point{0, 0}
+		ptDst := point{int32(curX), int32(curY)}
 		sz := size{int32(w), int32(h)}
 		bf := blendFunction{
 			BlendOp:             acSrcOver,

@@ -16,6 +16,7 @@ type Overlay interface {
 	SetEnabled(enabled bool)
 	IsEnabled() bool
 	SetState(state State, label string)
+	SetBounds(displayIndex, x, y, w, h int)
 	TriggerRipple(x, y int, isAI bool)
 	Close()
 }

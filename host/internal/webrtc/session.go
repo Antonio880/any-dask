@@ -209,6 +209,8 @@ func (s *PeerSession) markConnected() {
 		s.countedPeer = true
 		s.mgr.activePeers++
 		if s.mgr.activePeers == 1 && s.mgr.overlay != nil {
+			b := s.mgr.arbiter.ScreenBounds()
+			s.mgr.overlay.SetBounds(s.mgr.arbiter.ActiveDisplay(), b.X, b.Y, b.Width, b.Height)
 			s.mgr.overlay.SetState(overlay.StateConnected, "AnyDask · Conectado")
 		}
 	}
@@ -341,6 +343,9 @@ func (s *PeerSession) handleControlMessage(raw []byte) {
 		if json.Unmarshal(msg.Payload, &p) == nil {
 			disp := s.mgr.arbiter.SetActiveDisplay(p.Index)
 			s.mgr.streamer.SwitchDisplay(disp.Index, disp.X, disp.Y, disp.Width, disp.Height)
+			if s.mgr.overlay != nil {
+				s.mgr.overlay.SetBounds(disp.Index, disp.X, disp.Y, disp.Width, disp.Height)
+			}
 			log.Printf("[webrtc] switched active display -> #%d (%s)", disp.Index, disp.Name)
 			s.sendHostInfo()
 		}
