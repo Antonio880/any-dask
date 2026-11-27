@@ -47,9 +47,12 @@ Voltar para [[00-INDEX]] | Ver arquitetura em [[01-ARCHITECTURE]] | Ver design e
   - [x] Overlay nativo click-through no **Windows 11** (`UpdateLayeredWindow` per-pixel alpha: borda líquida Apple Intelligence + Dynamic Island com waveform viva + Liquid Glass Ripples em cada clique)
   - [x] Overlay nativo click-through no **macOS** (`NSWindow` + `NSVisualEffectView` blur real da Apple + borda líquida + Liquid Glass Ripples)
   - [x] Upgrade **iOS 26 Liquid Glass** no App Mobile (moldura perimetral sincronizada, reflexo especular diagonal, touch ripples refrativos e botão `✨` na DevBar para ligar/desligar o vidro no PC/Mac)
+- [x] **Multi-Monitor Nativo (macOS + Windows 11) + Modo Turbo Ultra-Latência:**
+  - [x] Descoberta de todos os monitores (`CGGetActiveDisplayList` no macOS / `EnumDisplayMonitors` no Windows) + troca ao vivo sem desconectar (`🖥 1/2` na DevBar) + mapeamento exato de coordenadas de toque e Computer Use no monitor selecionado
+  - [x] Redução agressiva de latência: leitura direta do pipe sem `bufio`, `-probesize 32 -analyzeduration 0`, `-pixel_format nv12` nativo no `avfoundation` do Mac, clique reduzido de `12ms` → `4ms`, clear parcial de memória no overlay Windows, e botão **`HD` / `⚡Turbo` (720p@60fps)** em 1 toque
 
 ### 🚧 In Progress
-- [ ] Validação ao vivo no Mac Mini (`git pull && ./start-anydask-mac.sh`) e no Windows 11
+- [ ] Validação do multi-monitor e modo Turbo no Mac Mini (`git pull && ./start-anydask-mac.sh`) e Windows 11
 
 ### 📌 Próximo Passo Imediato
 1. Rodar `bin\anydask-host.exe` neste Windows 11 para o usuário testar já no Android!

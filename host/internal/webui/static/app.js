@@ -59,6 +59,8 @@
   const btnZoomToggle = document.getElementById("btnZoomToggle");
   const btnRotate = document.getElementById("btnRotate");
   const btnGlassToggle = document.getElementById("btnGlassToggle");
+  const btnDisplaySwitch = document.getElementById("btnDisplaySwitch");
+  const btnTurboMode = document.getElementById("btnTurboMode");
   const toastEl = document.getElementById("toast");
 
   // App state
@@ -66,7 +68,8 @@
   let inputDC = null;
   let controlDC = null;
   let pingTimer = null;
-  let hostInfo = { hostname: "Host", os: "windows", primary_mod: "Ctrl", width: 1920, height: 1080 };
+  let hostInfo = { hostname: "Host", os: "windows", primary_mod: "Ctrl", width: 1920, height: 1080, active_display: 0, displays: [] };
+  let videoProfile = "hd"; // "hd" | "turbo"
   let currentHost = null;
   // Direct Touch is now the default: tapping clicks exactly where your finger touches!
   let inputMode = localStorage.getItem("anydask_input_mode_v2") || "touch"; // "touch" | "trackpad"
@@ -655,10 +658,20 @@
         hostInfo = { ...hostInfo, ...msg.payload };
         btnModPrimary.textContent = hostInfo.primary_mod === "Cmd" ? "⌘ Cmd" : "Ctrl";
         aiHostLabel.textContent = `${hostInfo.hostname} · ${hostInfo.os === "macos" ? "macOS" : "Win11"}`;
+        updateDisplayButton();
         if (currentHost) {
           currentHost.name = hostInfo.hostname;
           upsertHost({ name: hostInfo.hostname, url: currentHost.url, token: currentHost.token, os: hostInfo.os });
         }
+        break;
+      }
+      case "video.quality_state": {
+        videoProfile = msg.payload?.profile || "hd";
+        if (btnTurboMode) {
+          btnTurboMode.textContent = videoProfile === "turbo" ? "⚡Turbo" : "HD";
+          btnTurboMode.classList.toggle("active", videoProfile === "turbo");
+        }
+        showToast(videoProfile === "turbo" ? "⚡ Modo Turbo ativo (720p · máxima velocidade)" : "💎 Modo HD ativo (1080p)");
         break;
       }
       case "ai.status": {
@@ -1117,6 +1130,38 @@
     updateInputModeUI();
     showToast(inputMode === "trackpad" ? "Modo Trackpad (cursor relativo)" : "Modo Toque Direto (clica onde você toca)");
   });
+
+  function updateDisplayButton() {
+    if (!btnDisplaySwitch) return;
+    const list = hostInfo.displays || [];
+    if (list.length > 1) {
+      const idx = hostInfo.active_display || 0;
+      btnDisplaySwitch.textContent = `🖥 ${idx + 1}/${list.length}`;
+      btnDisplaySwitch.classList.remove("hidden");
+    } else {
+      btnDisplaySwitch.classList.add("hidden");
+    }
+  }
+
+  if (btnDisplaySwitch) {
+    btnDisplaySwitch.addEventListener("click", () => {
+      haptic(12);
+      const list = hostInfo.displays || [];
+      if (list.length <= 1) return;
+      const nextIdx = ((hostInfo.active_display || 0) + 1) % list.length;
+      const target = list[nextIdx];
+      sendControl("display.switch", { index: nextIdx });
+      showToast(`🖥 Trocando para ${target?.name || `Monitor ${nextIdx + 1}`}...`);
+    });
+  }
+
+  if (btnTurboMode) {
+    btnTurboMode.addEventListener("click", () => {
+      haptic(10);
+      const next = videoProfile === "turbo" ? "hd" : "turbo";
+      sendControl("video.quality", { profile: next });
+    });
+  }
 
   if (btnGlassToggle) {
     btnGlassToggle.addEventListener("click", () => {

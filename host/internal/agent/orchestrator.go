@@ -150,8 +150,9 @@ func (o *Orchestrator) runLoop(
 			MaxStep: maxSteps,
 		})
 
-		// 1. Capture crisp screenshot directly from local display memory
-		snap, err := capture.CaptureSnapshot(1280)
+		// 1. Capture crisp screenshot directly from the currently selected monitor
+		b := o.arbiter.ScreenBounds()
+		snap, err := capture.CaptureSnapshotForDisplay(1280, o.arbiter.ActiveDisplay(), b.X, b.Y, b.Width, b.Height)
 		if err != nil {
 			sink("ai.status", protocol.AIStatusPayload{
 				TaskID:  taskID,

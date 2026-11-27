@@ -11,6 +11,13 @@ type fakeInjector struct {
 	moves  int
 }
 
+func (f *fakeInjector) Displays() []protocol.DisplayInfo {
+	return []protocol.DisplayInfo{{Index: 0, Name: "Monitor 1", Width: f.bounds.Width, Height: f.bounds.Height, Primary: true}}
+}
+func (f *fakeInjector) ActiveDisplay() int { return 0 }
+func (f *fakeInjector) SetActiveDisplay(index int) protocol.DisplayInfo {
+	return f.Displays()[0]
+}
 func (f *fakeInjector) ScreenBounds() ScreenBounds                   { return f.bounds }
 func (f *fakeInjector) MoveRelative(dx, dy int) error                { f.moves++; return nil }
 func (f *fakeInjector) MoveAbsolute(x, y int) error                  { f.moves++; return nil }

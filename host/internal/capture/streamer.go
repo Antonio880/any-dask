@@ -1,7 +1,6 @@
 package capture
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -26,6 +25,7 @@ type Config struct {
 	Height      int
 	FPS         int
 	BitrateKbps int
+	MaxWidth    int // 1920 (HD) or 1280 (Turbo ultra-low latency)
 	FFmpegPath  string
 	Encoder     string // optional override; auto-detected if empty
 }
@@ -42,16 +42,24 @@ type SnapshotResult struct {
 // Streamer broadcasts H.264 Annex-B samples to all active WebRTC video subscribers.
 // When no subscribers are connected, capture stops automatically (0% CPU/GPU idle).
 type Streamer struct {
-	cfg         Config
-	mu          sync.Mutex
-	subs        map[uint64]func(media.Sample) error
-	nextID      uint64
-	cancel      context.CancelFunc
-	running     bool
-	encoderName string
-	captureMode string
-	lastSPS     []byte
-	lastPPS     []byte
+	cfg          Config
+	mu           sync.Mutex
+	subs         map[uint64]func(media.Sample) error
+	nextID       uint64
+	cancel       context.CancelFunc
+	procCancel   context.CancelFunc
+	running      bool
+	encoderName  string
+	captureMode  string
+	displayIndex int
+	displayX     int
+	displayY     int
+	displayW     int
+	displayH     int
+	maxWidth     int
+	bitrateKbps  int
+	lastSPS      []byte
+	lastPPS      []byte
 }
 
 func NewStreamer(cfg Config) *Streamer {
@@ -59,14 +67,21 @@ func NewStreamer(cfg Config) *Streamer {
 		cfg.FPS = 60
 	}
 	if cfg.BitrateKbps <= 0 {
-		cfg.BitrateKbps = 6000
+		cfg.BitrateKbps = 6500
+	}
+	if cfg.MaxWidth <= 0 {
+		cfg.MaxWidth = 1920
 	}
 	if cfg.FFmpegPath == "" {
 		cfg.FFmpegPath = findFFmpeg()
 	}
 	s := &Streamer{
-		cfg:  cfg,
-		subs: make(map[uint64]func(media.Sample) error),
+		cfg:         cfg,
+		subs:        make(map[uint64]func(media.Sample) error),
+		displayW:    cfg.Width,
+		displayH:    cfg.Height,
+		maxWidth:    cfg.MaxWidth,
+		bitrateKbps: cfg.BitrateKbps,
 	}
 	s.encoderName = s.detectEncoder()
 	s.captureMode = s.detectCaptureMode()
@@ -75,6 +90,38 @@ func NewStreamer(cfg Config) *Streamer {
 
 func (s *Streamer) EncoderName() string { return s.encoderName }
 func (s *Streamer) CaptureMode() string { return s.captureMode }
+
+// SwitchDisplay switches capture live to another monitor without dropping the WebRTC session.
+func (s *Streamer) SwitchDisplay(index, x, y, w, h int) {
+	s.mu.Lock()
+	s.displayIndex = index
+	s.displayX = x
+	s.displayY = y
+	s.displayW = w
+	s.displayH = h
+	pc := s.procCancel
+	s.mu.Unlock()
+	if pc != nil {
+		pc() // Triggers immediate FFmpeg restart on the newly selected monitor (<250ms)
+	}
+}
+
+// SetQualityProfile switches live between "turbo" (720p ultra-responsive) and "hd" (1080p sharp).
+func (s *Streamer) SetQualityProfile(profile string) {
+	s.mu.Lock()
+	if profile == "turbo" {
+		s.maxWidth = 1280
+		s.bitrateKbps = 4200
+	} else {
+		s.maxWidth = 1920
+		s.bitrateKbps = 6500
+	}
+	pc := s.procCancel
+	s.mu.Unlock()
+	if pc != nil {
+		pc()
+	}
+}
 
 // Subscribe registers a WebRTC video track writer and starts capture on demand.
 func (s *Streamer) Subscribe(writer func(media.Sample) error) func() {
@@ -118,17 +165,31 @@ func (s *Streamer) runLoop(ctx context.Context) {
 
 	useFallbackCapture := false
 	useFallbackEncoder := false
+	useFastPixFmt := true
 
 	for {
 		if ctx.Err() != nil {
 			return
 		}
-		err := s.streamOnce(ctx, useFallbackCapture, useFallbackEncoder)
+		procCtx, procCancel := context.WithCancel(ctx)
+		s.mu.Lock()
+		s.procCancel = procCancel
+		s.mu.Unlock()
+
+		err := s.streamOnce(procCtx, useFallbackCapture, useFallbackEncoder, useFastPixFmt)
+		procCancel()
 		if ctx.Err() != nil {
 			return
 		}
+		// If canceled intentionally by SwitchDisplay / SetQualityProfile, restart immediately without fallback!
+		if procCtx.Err() != nil {
+			continue
+		}
 		log.Printf("[capture] stream exited: %v", err)
-		if !useFallbackEncoder && s.encoderName != "libx264" {
+		if runtime.GOOS == "darwin" && useFastPixFmt {
+			log.Printf("[capture] retrying avfoundation without explicit nv12 pixel_format")
+			useFastPixFmt = false
+		} else if !useFallbackEncoder && s.encoderName != "libx264" {
 			log.Printf("[capture] falling back from %s to libx264 (keeping %s)", s.encoderName, s.captureMode)
 			useFallbackEncoder = true
 			s.encoderName = "libx264"
@@ -146,8 +207,8 @@ func (s *Streamer) runLoop(ctx context.Context) {
 	}
 }
 
-func (s *Streamer) streamOnce(ctx context.Context, fallbackCapture, fallbackEncoder bool) error {
-	args := s.buildFFmpegArgs(fallbackCapture, fallbackEncoder)
+func (s *Streamer) streamOnce(ctx context.Context, fallbackCapture, fallbackEncoder, fastPixFmt bool) error {
+	args := s.buildFFmpegArgs(fallbackCapture, fallbackEncoder, fastPixFmt)
 	log.Printf("[capture] starting ffmpeg (%s + %s): %s %s",
 		s.captureMode, s.encoderName, s.cfg.FFmpegPath, strings.Join(args, " "))
 
@@ -177,16 +238,30 @@ func (s *Streamer) streamOnce(ctx context.Context, fallbackCapture, fallbackEnco
 	return nil
 }
 
-func (s *Streamer) buildFFmpegArgs(fallbackCapture, fallbackEncoder bool) []string {
+func (s *Streamer) buildFFmpegArgs(fallbackCapture, fallbackEncoder, fastPixFmt bool) []string {
+	s.mu.Lock()
+	dispIdx := s.displayIndex
+	dispX, dispY, dispW, dispH := s.displayX, s.displayY, s.displayW, s.displayH
+	maxW := s.maxWidth
+	kbps := s.bitrateKbps
+	s.mu.Unlock()
+
+	if maxW <= 0 {
+		maxW = 1920
+	}
+	if kbps <= 0 {
+		kbps = 6500
+	}
+
 	fpsStr := strconv.Itoa(s.cfg.FPS)
 	gop := s.cfg.FPS / 2
 	if gop < 15 {
 		gop = 15
 	}
-	gopStr := strconv.Itoa(gop) // Fast keyframe (0.5s @ 60fps) for instant join & 4G/5G recovery
-	bitrate := fmt.Sprintf("%dk", s.cfg.BitrateKbps)
-	maxrate := fmt.Sprintf("%dk", int(float64(s.cfg.BitrateKbps)*1.25))
-	bufsize := fmt.Sprintf("%dk", s.cfg.BitrateKbps)
+	gopStr := strconv.Itoa(gop)
+	bitrate := fmt.Sprintf("%dk", kbps)
+	maxrate := fmt.Sprintf("%dk", int(float64(kbps)*1.25))
+	bufsize := fmt.Sprintf("%dk", kbps/2)
 
 	enc := s.encoderName
 	if fallbackEncoder {
@@ -194,46 +269,60 @@ func (s *Streamer) buildFFmpegArgs(fallbackCapture, fallbackEncoder bool) []stri
 	}
 
 	var args []string
-	args = append(args, "-hide_banner", "-loglevel", "error", "-fflags", "nobuffer", "-flags", "low_delay")
+	args = append(args,
+		"-hide_banner", "-loglevel", "error",
+		"-fflags", "nobuffer", "-flags", "low_delay",
+		"-probesize", "32", "-analyzeduration", "0",
+	)
 
 	pixFmt := "yuv420p"
 	if enc == "h264_amf" || enc == "h264_mf" || enc == "h264_qsv" || enc == "h264_videotoolbox" {
 		pixFmt = "nv12"
 	}
+	scaleFilter := fmt.Sprintf("scale='min(%d,iw)':-2:flags=fast_bilinear", maxW)
 
-	// 1. Input capture per OS (cap at 1920px wide so Mac Retina 4K/5K stays ultra-fast & Android MediaCodec compatible)
+	// 1. Input capture per OS (with native multi-monitor selection!)
 	switch runtime.GOOS {
 	case "windows":
 		if !fallbackCapture && s.captureMode == "ddagrab" {
 			args = append(args,
 				"-init_hw_device", "d3d11va",
-				"-filter_complex", fmt.Sprintf("ddagrab=framerate=%s:draw_mouse=1,hwdownload,format=bgra,scale='min(1920,iw)':-2:flags=fast_bilinear,format=%s", fpsStr, pixFmt),
+				"-filter_complex", fmt.Sprintf("ddagrab=output_idx=%d:framerate=%s:draw_mouse=1,hwdownload,format=bgra,%s,format=%s", dispIdx, fpsStr, scaleFilter, pixFmt),
 			)
 		} else {
 			args = append(args,
 				"-f", "gdigrab",
 				"-framerate", fpsStr,
 				"-draw_mouse", "1",
+			)
+			if dispW > 0 && dispH > 0 {
+				args = append(args,
+					"-offset_x", strconv.Itoa(dispX),
+					"-offset_y", strconv.Itoa(dispY),
+					"-video_size", fmt.Sprintf("%dx%d", dispW, dispH),
+				)
+			}
+			args = append(args,
 				"-i", "desktop",
-				"-vf", fmt.Sprintf("scale='min(1920,iw)':-2:flags=fast_bilinear,format=%s", pixFmt),
+				"-vf", fmt.Sprintf("%s,format=%s", scaleFilter, pixFmt),
 			)
 		}
 	case "darwin":
-		screenIdx := detectDarwinScreenIndex(s.cfg.FFmpegPath)
+		screenIdx := detectDarwinScreenIndex(s.cfg.FFmpegPath, dispIdx)
+		args = append(args, "-f", "avfoundation", "-framerate", fpsStr, "-capture_cursor", "1")
+		if fastPixFmt {
+			args = append(args, "-pixel_format", "nv12")
+		}
 		args = append(args,
-			"-f", "avfoundation",
-			"-framerate", fpsStr,
-			"-capture_cursor", "1",
 			"-i", screenIdx+":none",
-			// Force steady CFR output + cap Retina 4K/5K down to <=1080p so Android never freezes
-			"-vf", fmt.Sprintf("fps=%s,scale='min(1920,iw)':-2:flags=fast_bilinear,format=%s", fpsStr, pixFmt),
+			"-vf", fmt.Sprintf("fps=%s,%s,format=%s", fpsStr, scaleFilter, pixFmt),
 		)
 	default:
 		args = append(args,
 			"-f", "x11grab",
 			"-framerate", fpsStr,
 			"-i", ":0.0",
-			"-vf", fmt.Sprintf("scale='min(1920,iw)':-2:flags=fast_bilinear,format=%s", pixFmt),
+			"-vf", fmt.Sprintf("%s,format=%s", scaleFilter, pixFmt),
 		)
 	}
 
@@ -323,11 +412,10 @@ func (s *Streamer) buildFFmpegArgs(fallbackCapture, fallbackEncoder bool) []stri
 	return args
 }
 
-// parseAnnexB splits raw H.264 Annex-B stream into Access Units and writes them to all subscribers.
+// parseAnnexB reads directly from the OS pipe (zero bufio delay) and splits raw H.264 Annex-B into Access Units.
 func (s *Streamer) parseAnnexB(ctx context.Context, r io.Reader, frameDur time.Duration) error {
-	br := bufio.NewReaderSize(r, 64*1024)
 	buf := make([]byte, 0, 512*1024)
-	tmp := make([]byte, 32*1024)
+	tmp := make([]byte, 64*1024)
 
 	var au bytes.Buffer
 	hasVCL := false
@@ -425,7 +513,7 @@ func (s *Streamer) parseAnnexB(ctx context.Context, r io.Reader, frameDur time.D
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		n, err := br.Read(tmp)
+		n, err := r.Read(tmp)
 		if n > 0 {
 			buf = append(buf, tmp[:n]...)
 			for {
@@ -549,20 +637,30 @@ func (s *Streamer) detectCaptureMode() string {
 	}
 }
 
-func detectDarwinScreenIndex(ffmpegPath string) string {
+func detectDarwinScreenIndex(ffmpegPath string, displayIndex int) string {
+	target := fmt.Sprintf("Capture screen %d", displayIndex)
 	out, _ := exec.Command(ffmpegPath, "-hide_banner", "-f", "avfoundation", "-list_devices", "true", "-i", "").CombinedOutput()
+	var firstScreen string
 	for _, line := range strings.Split(string(out), "\n") {
-		if strings.Contains(line, "Capture screen 0") {
-			// Format: [AVFoundation indev @ ...] [1] Capture screen 0
-			lastOpen := strings.LastIndex(line, "[")
-			lastClose := strings.LastIndex(line, "]")
-			if lastOpen >= 0 && lastClose > lastOpen {
-				idx := strings.TrimSpace(line[lastOpen+1 : lastClose])
-				if _, err := strconv.Atoi(idx); err == nil {
+		if !strings.Contains(line, "Capture screen ") {
+			continue
+		}
+		lastOpen := strings.LastIndex(line, "[")
+		lastClose := strings.LastIndex(line, "]")
+		if lastOpen >= 0 && lastClose > lastOpen {
+			idx := strings.TrimSpace(line[lastOpen+1 : lastClose])
+			if _, err := strconv.Atoi(idx); err == nil {
+				if firstScreen == "" {
+					firstScreen = idx
+				}
+				if strings.Contains(line, target) {
 					return idx
 				}
 			}
 		}
+	}
+	if firstScreen != "" {
+		return firstScreen
 	}
 	return "1"
 }

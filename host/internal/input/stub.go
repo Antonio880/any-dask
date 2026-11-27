@@ -2,10 +2,19 @@
 
 package input
 
+import "github.com/anydask/host/internal/protocol"
+
 type stubInjector struct{}
 
 func NewInjector() Injector { return &stubInjector{} }
 
+func (s *stubInjector) Displays() []protocol.DisplayInfo {
+	return []protocol.DisplayInfo{{Index: 0, Name: "Monitor 1", Width: 1920, Height: 1080, Primary: true}}
+}
+func (s *stubInjector) ActiveDisplay() int { return 0 }
+func (s *stubInjector) SetActiveDisplay(index int) protocol.DisplayInfo {
+	return s.Displays()[0]
+}
 func (s *stubInjector) ScreenBounds() ScreenBounds                   { return ScreenBounds{Width: 1920, Height: 1080} }
 func (s *stubInjector) MoveRelative(dx, dy int) error                { return nil }
 func (s *stubInjector) MoveAbsolute(x, y int) error                  { return nil }

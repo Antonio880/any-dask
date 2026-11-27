@@ -45,12 +45,20 @@ type bitmapInfoHeader struct {
 	BiClrImportant  uint32
 }
 
-// CaptureSnapshot captures the primary screen directly in memory via GDI BitBlt (~15ms, zero external tools)
-// and returns a resized JPEG suitable for Computer Use vision models.
+// CaptureSnapshot captures the primary screen directly in memory via GDI BitBlt (~15ms, zero external tools).
 func CaptureSnapshot(maxWidth int) (SnapshotResult, error) {
-	wPtr, _, _ := procGetSysMetricsCap.Call(0)
-	hPtr, _, _ := procGetSysMetricsCap.Call(1)
-	w, h := int(wPtr), int(hPtr)
+	return CaptureSnapshotForDisplay(maxWidth, 0, 0, 0, 0, 0)
+}
+
+// CaptureSnapshotForDisplay captures the exact (x, y, w, h) region of the active monitor on Windows.
+func CaptureSnapshotForDisplay(maxWidth, displayIndex, sx, sy, sw, sh int) (SnapshotResult, error) {
+	w, h := sw, sh
+	if w <= 0 || h <= 0 {
+		wPtr, _, _ := procGetSysMetricsCap.Call(0)
+		hPtr, _, _ := procGetSysMetricsCap.Call(1)
+		w, h = int(wPtr), int(hPtr)
+		sx, sy = 0, 0
+	}
 	if w <= 0 || h <= 0 {
 		return SnapshotResult{}, errors.New("invalid screen dimensions")
 	}
@@ -78,7 +86,7 @@ func CaptureSnapshot(maxWidth int) (SnapshotResult, error) {
 
 	ok, _, _ := procBitBlt.Call(
 		hdcMem, 0, 0, uintptr(w), uintptr(h),
-		hdcScreen, 0, 0, srcCopy|captureBlt,
+		hdcScreen, uintptr(sx), uintptr(sy), srcCopy|captureBlt,
 	)
 	if ok == 0 {
 		return SnapshotResult{}, errors.New("BitBlt failed")

@@ -3,7 +3,9 @@
 package input
 
 import (
+	"fmt"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode/utf16"
@@ -13,13 +15,15 @@ import (
 )
 
 var (
-	user32               = syscall.NewLazyDLL("user32.dll")
-	procSendInput        = user32.NewProc("SendInput")
-	procGetSystemMetrics = user32.NewProc("GetSystemMetrics")
-	procSetCursorPos     = user32.NewProc("SetCursorPos")
-	procGetCursorPos     = user32.NewProc("GetCursorPos")
-	procVkKeyScanW       = user32.NewProc("VkKeyScanW")
-	procSetProcessDPI    = user32.NewProc("SetProcessDPIAware")
+	user32                  = syscall.NewLazyDLL("user32.dll")
+	procSendInput           = user32.NewProc("SendInput")
+	procGetSystemMetrics    = user32.NewProc("GetSystemMetrics")
+	procSetCursorPos        = user32.NewProc("SetCursorPos")
+	procGetCursorPos        = user32.NewProc("GetCursorPos")
+	procVkKeyScanW          = user32.NewProc("VkKeyScanW")
+	procSetProcessDPI       = user32.NewProc("SetProcessDPIAware")
+	procEnumDisplayMonitors = user32.NewProc("EnumDisplayMonitors")
+	procGetMonitorInfoW     = user32.NewProc("GetMonitorInfoW")
 )
 
 const (
@@ -82,7 +86,21 @@ type point struct {
 	Y int32
 }
 
-type windowsInjector struct{}
+type rect struct {
+	Left, Top, Right, Bottom int32
+}
+
+type monitorInfo struct {
+	cbSize    uint32
+	rcMonitor rect
+	rcWork    rect
+	dwFlags   uint32
+}
+
+type windowsInjector struct {
+	mu            sync.RWMutex
+	activeDisplay int
+}
 
 func NewInjector() Injector {
 	// Ensure physical pixel coordinates match DXGI/GDI screen capture even on HiDPI (125%/150%/200%).
@@ -90,18 +108,80 @@ func NewInjector() Injector {
 	return &windowsInjector{}
 }
 
+func (w *windowsInjector) Displays() []protocol.DisplayInfo {
+	var list []protocol.DisplayInfo
+	cb := syscall.NewCallback(func(hMon, hdc, lprc, dwData uintptr) uintptr {
+		var mi monitorInfo
+		mi.cbSize = uint32(unsafe.Sizeof(mi))
+		ok, _, _ := procGetMonitorInfoW.Call(hMon, uintptr(unsafe.Pointer(&mi)))
+		if ok != 0 {
+			idx := len(list)
+			mw := int(mi.rcMonitor.Right - mi.rcMonitor.Left)
+			mh := int(mi.rcMonitor.Bottom - mi.rcMonitor.Top)
+			primary := (mi.dwFlags & 1) != 0
+			name := fmt.Sprintf("Monitor %d (%dx%d)", idx+1, mw, mh)
+			if primary {
+				name = fmt.Sprintf("Principal (%dx%d)", mw, mh)
+			}
+			list = append(list, protocol.DisplayInfo{
+				Index:   idx,
+				Name:    name,
+				X:       int(mi.rcMonitor.Left),
+				Y:       int(mi.rcMonitor.Top),
+				Width:   mw,
+				Height:  mh,
+				Primary: primary,
+			})
+		}
+		return 1
+	})
+	_, _, _ = procEnumDisplayMonitors.Call(0, 0, cb, 0)
+	if len(list) == 0 {
+		cx, _, _ := procGetSystemMetrics.Call(smCXScreen)
+		cy, _, _ := procGetSystemMetrics.Call(smCYScreen)
+		width, height := int(cx), int(cy)
+		if width <= 0 {
+			width = 1920
+		}
+		if height <= 0 {
+			height = 1080
+		}
+		list = append(list, protocol.DisplayInfo{
+			Index:   0,
+			Name:    fmt.Sprintf("Principal (%dx%d)", width, height),
+			Width:   width,
+			Height:  height,
+			Primary: true,
+		})
+	}
+	return list
+}
+
+func (w *windowsInjector) ActiveDisplay() int {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.activeDisplay
+}
+
+func (w *windowsInjector) SetActiveDisplay(index int) protocol.DisplayInfo {
+	list := w.Displays()
+	if index < 0 || index >= len(list) {
+		index = 0
+	}
+	w.mu.Lock()
+	w.activeDisplay = index
+	w.mu.Unlock()
+	return list[index]
+}
+
 func (w *windowsInjector) ScreenBounds() ScreenBounds {
-	cx, _, _ := procGetSystemMetrics.Call(smCXScreen)
-	cy, _, _ := procGetSystemMetrics.Call(smCYScreen)
-	width := int(cx)
-	height := int(cy)
-	if width <= 0 {
-		width = 1920
+	list := w.Displays()
+	idx := w.ActiveDisplay()
+	if idx < 0 || idx >= len(list) {
+		idx = 0
 	}
-	if height <= 0 {
-		height = 1080
-	}
-	return ScreenBounds{X: 0, Y: 0, Width: width, Height: height}
+	cur := list[idx]
+	return ScreenBounds{X: cur.X, Y: cur.Y, Width: cur.Width, Height: cur.Height}
 }
 
 func (w *windowsInjector) MoveRelative(dx, dy int) error {
@@ -110,17 +190,17 @@ func (w *windowsInjector) MoveRelative(dx, dy int) error {
 	b := w.ScreenBounds()
 	nx := int(pt.X) + dx
 	ny := int(pt.Y) + dy
-	if nx < 0 {
-		nx = 0
+	if nx < b.X {
+		nx = b.X
 	}
-	if ny < 0 {
-		ny = 0
+	if ny < b.Y {
+		ny = b.Y
 	}
-	if nx >= b.Width {
-		nx = b.Width - 1
+	if nx >= b.X+b.Width {
+		nx = b.X + b.Width - 1
 	}
-	if ny >= b.Height {
-		ny = b.Height - 1
+	if ny >= b.Y+b.Height {
+		ny = b.Y + b.Height - 1
 	}
 	_, _, _ = procSetCursorPos.Call(uintptr(nx), uintptr(ny))
 	return nil
@@ -160,15 +240,15 @@ func (w *windowsInjector) MouseButton(button uint8, action uint8) error {
 		w.sendMouseFlag(upFlag, 0)
 	case protocol.MouseActionClick:
 		w.sendMouseFlag(downFlag, 0)
-		time.Sleep(12 * time.Millisecond)
+		time.Sleep(4 * time.Millisecond)
 		w.sendMouseFlag(upFlag, 0)
 	case protocol.MouseActionDblClick:
 		w.sendMouseFlag(downFlag, 0)
-		time.Sleep(12 * time.Millisecond)
+		time.Sleep(4 * time.Millisecond)
 		w.sendMouseFlag(upFlag, 0)
-		time.Sleep(35 * time.Millisecond)
+		time.Sleep(24 * time.Millisecond)
 		w.sendMouseFlag(downFlag, 0)
-		time.Sleep(12 * time.Millisecond)
+		time.Sleep(4 * time.Millisecond)
 		w.sendMouseFlag(upFlag, 0)
 	}
 	return nil

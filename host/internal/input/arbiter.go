@@ -31,6 +31,9 @@ type ScreenBounds struct {
 
 // Injector is implemented per OS (Windows via user32 SendInput, macOS via CoreGraphics CGEvent).
 type Injector interface {
+	Displays() []protocol.DisplayInfo
+	ActiveDisplay() int
+	SetActiveDisplay(index int) protocol.DisplayInfo
 	ScreenBounds() ScreenBounds
 	MoveRelative(dx, dy int) error
 	MoveAbsolute(x, y int) error
@@ -67,6 +70,18 @@ func (a *Arbiter) Mode() Mode {
 
 func (a *Arbiter) ScreenBounds() ScreenBounds {
 	return a.injector.ScreenBounds()
+}
+
+func (a *Arbiter) Displays() []protocol.DisplayInfo {
+	return a.injector.Displays()
+}
+
+func (a *Arbiter) ActiveDisplay() int {
+	return a.injector.ActiveDisplay()
+}
+
+func (a *Arbiter) SetActiveDisplay(index int) protocol.DisplayInfo {
+	return a.injector.SetActiveDisplay(index)
 }
 
 // AcquireAI locks the arbiter for an AI task.

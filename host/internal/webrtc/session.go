@@ -255,6 +255,8 @@ func (s *PeerSession) SendControl(msgType string, payload any) {
 func (s *PeerSession) sendHostInfo() {
 	host, _ := os.Hostname()
 	b := s.mgr.arbiter.ScreenBounds()
+	displays := s.mgr.arbiter.Displays()
+	activeIdx := s.mgr.arbiter.ActiveDisplay()
 	osName := runtime.GOOS
 	primary := "Ctrl"
 	if osName == "darwin" {
@@ -262,15 +264,17 @@ func (s *PeerSession) sendHostInfo() {
 		primary = "Cmd"
 	}
 	s.SendControl("host.info", protocol.HostInfo{
-		Hostname:    host,
-		OS:          osName,
-		Arch:        runtime.GOARCH,
-		Width:       b.Width,
-		Height:      b.Height,
-		FPS:         s.mgr.fps,
-		Encoder:     s.mgr.streamer.EncoderName(),
-		CaptureMode: s.mgr.streamer.CaptureMode(),
-		PrimaryMod:  primary,
+		Hostname:      host,
+		OS:            osName,
+		Arch:          runtime.GOARCH,
+		Width:         b.Width,
+		Height:        b.Height,
+		FPS:           s.mgr.fps,
+		Encoder:       s.mgr.streamer.EncoderName(),
+		CaptureMode:   s.mgr.streamer.CaptureMode(),
+		PrimaryMod:    primary,
+		ActiveDisplay: activeIdx,
+		Displays:      displays,
 	})
 }
 
@@ -330,6 +334,25 @@ func (s *PeerSession) handleControlMessage(raw []byte) {
 			next := !s.mgr.overlay.IsEnabled()
 			s.mgr.overlay.SetEnabled(next)
 			s.SendControl("overlay.state", map[string]any{"enabled": next})
+		}
+
+	case "display.switch":
+		var p protocol.DisplaySwitchPayload
+		if json.Unmarshal(msg.Payload, &p) == nil {
+			disp := s.mgr.arbiter.SetActiveDisplay(p.Index)
+			s.mgr.streamer.SwitchDisplay(disp.Index, disp.X, disp.Y, disp.Width, disp.Height)
+			log.Printf("[webrtc] switched active display -> #%d (%s)", disp.Index, disp.Name)
+			s.sendHostInfo()
+		}
+
+	case "video.quality":
+		var p struct {
+			Profile string `json:"profile"` // "turbo" | "hd"
+		}
+		if json.Unmarshal(msg.Payload, &p) == nil {
+			s.mgr.streamer.SetQualityProfile(p.Profile)
+			log.Printf("[webrtc] switched video quality profile -> %s", p.Profile)
+			s.SendControl("video.quality_state", map[string]any{"profile": p.Profile})
 		}
 	}
 }

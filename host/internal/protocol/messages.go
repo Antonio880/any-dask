@@ -95,16 +95,32 @@ func MarshalControl(msgType string, ts int64, payload any) ([]byte, error) {
 	})
 }
 
+type DisplayInfo struct {
+	Index   int    `json:"index"`
+	Name    string `json:"name"`
+	X       int    `json:"x"`
+	Y       int    `json:"y"`
+	Width   int    `json:"width"`
+	Height  int    `json:"height"`
+	Primary bool   `json:"primary"`
+}
+
 type HostInfo struct {
-	Hostname    string `json:"hostname"`
-	OS          string `json:"os"` // "windows" | "macos" | "linux"
-	Arch        string `json:"arch"`
-	Width       int    `json:"width"`
-	Height      int    `json:"height"`
-	FPS         int    `json:"fps"`
-	Encoder     string `json:"encoder"`
-	CaptureMode string `json:"capture_mode"`
-	PrimaryMod  string `json:"primary_mod"` // "Ctrl" or "Cmd"
+	Hostname      string        `json:"hostname"`
+	OS            string        `json:"os"` // "windows" | "macos" | "linux"
+	Arch          string        `json:"arch"`
+	Width         int           `json:"width"`
+	Height        int           `json:"height"`
+	FPS           int           `json:"fps"`
+	Encoder       string        `json:"encoder"`
+	CaptureMode   string        `json:"capture_mode"`
+	PrimaryMod    string        `json:"primary_mod"` // "Ctrl" or "Cmd"
+	ActiveDisplay int           `json:"active_display"`
+	Displays      []DisplayInfo `json:"displays"`
+}
+
+type DisplaySwitchPayload struct {
+	Index int `json:"index"`
 }
 
 type KeyEventPayload struct {

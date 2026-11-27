@@ -6,10 +6,37 @@ package input
 #cgo LDFLAGS: -framework ApplicationServices -framework CoreFoundation
 #include <ApplicationServices/ApplicationServices.h>
 
-static void macScreenSize(int *w, int *h) {
-    CGRect bounds = CGDisplayBounds(CGMainDisplayID());
-    *w = (int)bounds.size.width;
-    *h = (int)bounds.size.height;
+typedef struct {
+    int x;
+    int y;
+    int w;
+    int h;
+    int isMain;
+} MacDisplayRect;
+
+static int macListDisplays(MacDisplayRect *out, int maxCount) {
+    CGDirectDisplayID ids[16];
+    uint32_t count = 0;
+    if (CGGetActiveDisplayList(16, ids, &count) != kCGErrorSuccess || count == 0) {
+        CGRect b = CGDisplayBounds(CGMainDisplayID());
+        out[0].x = (int)b.origin.x;
+        out[0].y = (int)b.origin.y;
+        out[0].w = (int)b.size.width;
+        out[0].h = (int)b.size.height;
+        out[0].isMain = 1;
+        return 1;
+    }
+    if ((int)count > maxCount) count = (uint32_t)maxCount;
+    CGDirectDisplayID mainID = CGMainDisplayID();
+    for (uint32_t i = 0; i < count; i++) {
+        CGRect b = CGDisplayBounds(ids[i]);
+        out[i].x = (int)b.origin.x;
+        out[i].y = (int)b.origin.y;
+        out[i].w = (int)b.size.width;
+        out[i].h = (int)b.size.height;
+        out[i].isMain = (ids[i] == mainID) ? 1 : 0;
+    }
+    return (int)count;
 }
 
 static void macGetCursor(double *x, double *y) {
@@ -84,23 +111,71 @@ static void macUnicodeChar(uint16_t ch) {
 import "C"
 
 import (
+	"fmt"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf16"
 
 	"github.com/anydask/host/internal/protocol"
 )
 
-type darwinInjector struct{}
+type darwinInjector struct {
+	mu            sync.RWMutex
+	activeDisplay int
+}
 
 func NewInjector() Injector {
 	return &darwinInjector{}
 }
 
+func (d *darwinInjector) Displays() []protocol.DisplayInfo {
+	var rects [8]C.MacDisplayRect
+	n := int(C.macListDisplays(&rects[0], 8))
+	out := make([]protocol.DisplayInfo, 0, n)
+	for i := 0; i < n; i++ {
+		name := fmt.Sprintf("Monitor %d (%dx%d)", i+1, int(rects[i].w), int(rects[i].h))
+		if rects[i].isMain != 0 {
+			name = fmt.Sprintf("Principal (%dx%d)", int(rects[i].w), int(rects[i].h))
+		}
+		out = append(out, protocol.DisplayInfo{
+			Index:   i,
+			Name:    name,
+			X:       int(rects[i].x),
+			Y:       int(rects[i].y),
+			Width:   int(rects[i].w),
+			Height:  int(rects[i].h),
+			Primary: rects[i].isMain != 0,
+		})
+	}
+	return out
+}
+
+func (d *darwinInjector) ActiveDisplay() int {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.activeDisplay
+}
+
+func (d *darwinInjector) SetActiveDisplay(index int) protocol.DisplayInfo {
+	list := d.Displays()
+	if index < 0 || index >= len(list) {
+		index = 0
+	}
+	d.mu.Lock()
+	d.activeDisplay = index
+	d.mu.Unlock()
+	return list[index]
+}
+
 func (d *darwinInjector) ScreenBounds() ScreenBounds {
-	var w, h C.int
-	C.macScreenSize(&w, &h)
-	return ScreenBounds{X: 0, Y: 0, Width: int(w), Height: int(h)}
+	list := d.Displays()
+	idx := d.ActiveDisplay()
+	if idx < 0 || idx >= len(list) {
+		idx = 0
+	}
+	cur := list[idx]
+	return ScreenBounds{X: cur.X, Y: cur.Y, Width: cur.Width, Height: cur.Height}
 }
 
 func (d *darwinInjector) MoveRelative(dx, dy int) error {
@@ -109,17 +184,17 @@ func (d *darwinInjector) MoveRelative(dx, dy int) error {
 	b := d.ScreenBounds()
 	nx := float64(cx) + float64(dx)
 	ny := float64(cy) + float64(dy)
-	if nx < 0 {
-		nx = 0
+	if nx < float64(b.X) {
+		nx = float64(b.X)
 	}
-	if ny < 0 {
-		ny = 0
+	if ny < float64(b.Y) {
+		ny = float64(b.Y)
 	}
-	if nx >= float64(b.Width) {
-		nx = float64(b.Width - 1)
+	if nx >= float64(b.X+b.Width) {
+		nx = float64(b.X + b.Width - 1)
 	}
-	if ny >= float64(b.Height) {
-		ny = float64(b.Height - 1)
+	if ny >= float64(b.Y+b.Height) {
+		ny = float64(b.Y + b.Height - 1)
 	}
 	C.macMoveMouse(C.double(nx), C.double(ny))
 	return nil
@@ -140,15 +215,15 @@ func (d *darwinInjector) MouseButton(button uint8, action uint8) error {
 		C.macMouseBtn(C.int(button), 0, cx, cy)
 	case protocol.MouseActionClick:
 		C.macMouseBtn(C.int(button), 1, cx, cy)
-		time.Sleep(12 * time.Millisecond)
+		time.Sleep(4 * time.Millisecond)
 		C.macMouseBtn(C.int(button), 0, cx, cy)
 	case protocol.MouseActionDblClick:
 		C.macMouseBtn(C.int(button), 1, cx, cy)
-		time.Sleep(12 * time.Millisecond)
+		time.Sleep(4 * time.Millisecond)
 		C.macMouseBtn(C.int(button), 0, cx, cy)
-		time.Sleep(35 * time.Millisecond)
+		time.Sleep(24 * time.Millisecond)
 		C.macMouseBtn(C.int(button), 1, cx, cy)
-		time.Sleep(12 * time.Millisecond)
+		time.Sleep(4 * time.Millisecond)
 		C.macMouseBtn(C.int(button), 0, cx, cy)
 	}
 	return nil

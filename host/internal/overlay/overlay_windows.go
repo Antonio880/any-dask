@@ -242,6 +242,7 @@ func (o *winOverlay) uiThread() {
 	buf := unsafe.Slice((*byte)(bits), w*h*4)
 
 	visible := false
+	hadRipples := false
 	phase := 0.0
 	ticker := time.NewTicker(33 * time.Millisecond) // smooth ~30fps liquid motion
 	defer ticker.Stop()
@@ -300,7 +301,9 @@ func (o *winOverlay) uiThread() {
 		}
 		phase += speed
 
-		renderLiquidGlass(buf, w, h, phase, intensity, borderDepth, st, ripplesCopy, now)
+		needFullClear := len(ripplesCopy) > 0 || hadRipples
+		hadRipples = len(ripplesCopy) > 0
+		renderLiquidGlass(buf, w, h, phase, intensity, borderDepth, st, ripplesCopy, needFullClear, now)
 
 		ptSrc := point{0, 0}
 		ptDst := point{0, 0}
@@ -326,9 +329,36 @@ func (o *winOverlay) uiThread() {
 
 // renderLiquidGlass paints Apple Intelligence liquid perimeter glow, top glass Dynamic Island pill,
 // and refractive touch/AI click ripples using premultiplied BGRA pixels.
-func renderLiquidGlass(buf []byte, w, h int, phase, intensity float64, borderDepth int, st State, ripples []ripple, now time.Time) {
-	// Clear buffer quickly
-	clear(buf)
+func renderLiquidGlass(buf []byte, w, h int, phase, intensity float64, borderDepth int, st State, ripples []ripple, fullClear bool, now time.Time) {
+	// 1. Keep CPU/memory ultra-light: only clear perimeter & top pill unless ripples were active
+	if fullClear {
+		clear(buf)
+	} else {
+		clearRect := func(x0, y0, x1, y1 int) {
+			if x0 < 0 {
+				x0 = 0
+			}
+			if y0 < 0 {
+				y0 = 0
+			}
+			if x1 > w {
+				x1 = w
+			}
+			if y1 > h {
+				y1 = h
+			}
+			for y := y0; y < y1; y++ {
+				off := (y*w + x0) * 4
+				clear(buf[off : off+(x1-x0)*4])
+			}
+		}
+		clearBand := borderDepth + 4
+		clearRect(0, 0, w, clearBand)
+		clearRect(0, h-clearBand, w, h)
+		clearRect(0, clearBand, clearBand, h-clearBand)
+		clearRect(w-clearBand, clearBand, w, h-clearBand)
+		clearRect((w-280)/2, 0, (w+280)/2, 70)
+	}
 
 	// 1. Liquid Glass / Apple Intelligence Perimeter Glow (only touches perimeter bands -> ultra fast!)
 	drawBand := func(x0, y0, x1, y1 int) {
