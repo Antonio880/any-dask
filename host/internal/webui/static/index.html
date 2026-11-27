@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   <title>AnyDask Remote + AI</title>
-  <link rel="stylesheet" href="/styles.css?v=5" />
+  <link rel="stylesheet" href="/styles.css?v=6" />
 </head>
 <body>
   <!-- Fullscreen WebRTC Video Viewport -->
@@ -84,16 +84,34 @@
     </div>
   </div>
 
-  <!-- Top Dynamic Island Pill (shown when AI is THINKING / ACTING or subtle host HUD) -->
-  <div id="dynamicIsland" class="dynamic-island glass-regular hidden">
-    <div class="island-left">
-      <span id="islandOrb" class="island-dot"></span>
-      <div class="island-text">
-        <div id="islandTitle" class="island-title">Agente ativo</div>
-        <div id="islandSub" class="island-sub">Analisando tela...</div>
+  <!-- Top Dynamic Island Pill + Live AI Activity Feed (shows everything the AI is doing in real time!) -->
+  <div id="dynamicIslandWrap" class="dynamic-island-wrap hidden">
+    <div id="dynamicIsland" class="dynamic-island glass-regular">
+      <div id="islandToggleLog" class="island-left" title="Toque para expandir/recolher o log ao vivo">
+        <span id="islandOrb" class="island-dot"></span>
+        <div class="island-text">
+          <div id="islandTitle" class="island-title">Agente ativo</div>
+          <div id="islandSub" class="island-sub">Analisando tela...</div>
+        </div>
+      </div>
+      <div class="island-right">
+        <span id="islandTimer" class="island-timer">0.0s</span>
+        <button id="btnKillSwitch" class="btn-kill" title="Parar e assumir controle imediatamente">PARAR</button>
       </div>
     </div>
-    <button id="btnKillSwitch" class="btn-kill" title="Parar e assumir controle imediatamente">PARAR</button>
+    <div id="aiLiveLog" class="ai-live-log glass-thin"></div>
+  </div>
+
+  <!-- Hold-to-Talk Liquid Glass Voice HUD (appears while holding the Floating Bot) -->
+  <div id="voiceHud" class="voice-hud glass-regular hidden" aria-live="polite">
+    <span class="voice-rec-dot"></span>
+    <div class="voice-bars" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div class="voice-hud-text">
+      <div id="voiceHudTitle" class="voice-hud-title">Ouvindo você... <span id="voiceHudTimer">0:00</span></div>
+      <div class="voice-hud-sub">Solte o botão para enviar para a IA</div>
+    </div>
   </div>
 
   <!-- Floating AI Assistant Bot (Fluid spring physics, expressive eyes, Siri/VisionOS aura) -->
@@ -290,7 +308,7 @@
         </select>
 
         <label class="field-label">Modelo</label>
-        <input id="cfgModel" class="glass-input" placeholder="gemini-3-flash-preview" />
+        <input id="cfgModel" class="glass-input" placeholder="gemini-3.1-flash-lite" />
 
         <label class="field-label">API Key (armazenada localmente neste aparelho)</label>
         <input id="cfgApiKey" type="password" class="glass-input" placeholder="Cole sua chave de API" />
@@ -314,6 +332,6 @@
   <!-- Toast feedback -->
   <div id="toast" class="toast glass-thin hidden"></div>
 
-  <script src="/app.js?v=5"></script>
+  <script src="/app.js?v=6"></script>
 </body>
 </html>

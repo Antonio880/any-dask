@@ -11,7 +11,7 @@
   const ACT_UP = 0, ACT_DOWN = 1, ACT_CLICK = 2, ACT_DBLCLICK = 3;
 
   const DEFAULT_MODELS = {
-    gemini: "gemini-3-flash-preview",
+    gemini: "gemini-3.1-flash-lite",
     anthropic: "claude-sonnet-4-5-20250929",
     openai: "gpt-4o",
   };
@@ -63,10 +63,16 @@
   video.addEventListener("playing", revealVideoWhenReady);
   video.addEventListener("resize", revealVideoWhenReady);
 
+  const dynamicIslandWrap = document.getElementById("dynamicIslandWrap");
   const dynamicIsland = document.getElementById("dynamicIsland");
+  const islandToggleLog = document.getElementById("islandToggleLog");
   const islandTitle = document.getElementById("islandTitle");
   const islandSub = document.getElementById("islandSub");
+  const islandTimer = document.getElementById("islandTimer");
+  const aiLiveLog = document.getElementById("aiLiveLog");
   const btnKillSwitch = document.getElementById("btnKillSwitch");
+  const voiceHud = document.getElementById("voiceHud");
+  const voiceHudTimer = document.getElementById("voiceHudTimer");
 
   const aiOrb = document.getElementById("aiOrb");
   const botEyesMini = document.getElementById("botEyesMini");
@@ -142,9 +148,15 @@
   function loadSettings() {
     try {
       const s = JSON.parse(localStorage.getItem("anydask_settings") || "{}");
+      const prov = s.provider || "gemini";
+      let mod = s.model || DEFAULT_MODELS[prov];
+      // Auto-upgrade slow/deprecated Gemini models to verified 1.4s gemini-3.1-flash-lite
+      if (prov === "gemini" && (mod === "gemini-2.5-flash" || mod === "gemini-3-flash-preview" || mod === "gemini-2.0-flash")) {
+        mod = "gemini-3.1-flash-lite";
+      }
       return {
-        provider: s.provider || "gemini",
-        model: s.model || DEFAULT_MODELS[s.provider || "gemini"],
+        provider: prov,
+        model: mod,
         apiKey: s.apiKey || "",
         baseUrl: s.baseUrl || "",
         requireConfirm: s.requireConfirm !== false,
@@ -728,8 +740,13 @@
       }
       case "ai.step_done": {
         const p = msg.payload || {};
-        if (!p.success && p.output) {
-          appendFeed(`⚠️ ${p.output}`);
+        if (p.success) {
+          const shortOut = (p.output || "").trim().split("\n")[0].slice(0, 90);
+          if (shortOut && shortOut !== "(sem saída)") {
+            appendFeed(`✓ ${shortOut}`, "done");
+          }
+        } else if (p.output) {
+          appendFeed(`⚠️ ${p.output}`, "error");
         }
         break;
       }
@@ -763,15 +780,52 @@
     haloTimer = setTimeout(() => clickHalo.classList.add("hidden"), 1100);
   }
 
-  function appendFeed(line) {
+  let aiTaskStartMs = 0;
+  let aiTimerInterval = null;
+  let aiHideLogTimer = null;
+
+  if (islandToggleLog && aiLiveLog) {
+    islandToggleLog.addEventListener("click", () => {
+      aiLiveLog.classList.toggle("hidden");
+    });
+  }
+
+  function startAITimer() {
+    clearInterval(aiTimerInterval);
+    clearTimeout(aiHideLogTimer);
+    aiTaskStartMs = performance.now();
+    if (islandTimer) islandTimer.textContent = "0.0s";
+    aiTimerInterval = setInterval(() => {
+      if (islandTimer) {
+        const s = (performance.now() - aiTaskStartMs) / 1000;
+        islandTimer.textContent = `${s.toFixed(1)}s`;
+      }
+    }, 100);
+  }
+
+  function stopAITimer() {
+    clearInterval(aiTimerInterval);
+  }
+
+  function appendFeed(line, kind = "") {
     aiFeed.classList.remove("hidden");
     const div = document.createElement("div");
     div.textContent = line;
     aiFeed.appendChild(div);
     aiFeed.scrollTop = aiFeed.scrollHeight;
+
+    if (aiLiveLog) {
+      const row = document.createElement("div");
+      row.className = "ai-live-log-item" + (kind === "error" ? " is-error" : kind === "done" ? " is-done" : "");
+      const elapsed = aiTaskStartMs ? `${((performance.now() - aiTaskStartMs) / 1000).toFixed(1)}s` : "0.0s";
+      row.innerHTML = `<span class="ai-live-log-time">${elapsed}</span><span>${escapeHtml(line)}</span>`;
+      aiLiveLog.appendChild(row);
+      aiLiveLog.scrollTop = aiLiveLog.scrollHeight;
+    }
   }
 
   function setAIState(state, message, step, maxStep) {
+    const prevState = aiState;
     aiState = state;
     aiOrb.classList.remove("state-idle", "state-listening", "state-thinking", "state-acting");
     if (botHero) {
@@ -779,35 +833,60 @@
     }
 
     if (state === "THINKING" || state === "ACTING" || state === "CONFIRM") {
+      clearTimeout(aiHideLogTimer);
+      if (prevState !== "THINKING" && prevState !== "ACTING" && prevState !== "CONFIRM") {
+        startAITimer();
+      }
       const cls = state === "THINKING" ? "state-thinking" : "state-acting";
       aiOrb.classList.add(cls);
       if (botHero) botHero.classList.add(cls);
       if (liquidEdgeGlow) liquidEdgeGlow.classList.add("ai-active");
       if (botHeroTitle) botHeroTitle.textContent = state === "THINKING" ? "Analisando tela..." : "Agindo no PC";
       if (botHeroSub) botHeroSub.textContent = message || "Executando sua instrução...";
-      aiOverlay.classList.add("hidden"); // Free 92% of screen so user watches live!
-      dynamicIsland.classList.remove("hidden");
-      islandTitle.textContent = step ? `Agente · Passo ${step}/${maxStep || 18}` : "Agente Ativo";
+      aiOverlay.classList.add("hidden"); // Keep 90% of desktop visible while AI acts!
+      if (dynamicIslandWrap) dynamicIslandWrap.classList.remove("hidden");
+      if (aiLiveLog) aiLiveLog.classList.remove("hidden");
+      if (btnKillSwitch) btnKillSwitch.classList.remove("hidden");
+      islandTitle.textContent = step ? `AnyDask AI · Passo ${step}/${maxStep || 18}` : "AnyDask AI";
       islandSub.textContent = message || "Operando computador...";
+      if (message && (message.startsWith("📸") || message.startsWith("🧠"))) {
+        appendFeed(message);
+      }
     } else {
+      stopAITimer();
       aiOrb.classList.add("state-idle");
       if (botHero) botHero.classList.add("state-idle");
       if (liquidEdgeGlow) liquidEdgeGlow.classList.remove("ai-active");
       if (botHeroTitle) botHeroTitle.textContent = "AnyDask AI";
       if (botHeroSub) botHeroSub.textContent = "Estou vendo sua tela. O que fazemos?";
-      dynamicIsland.classList.add("hidden");
       clickHalo.classList.add("hidden");
+
       if (state === "COMPLETED") {
-        appendFeed(`✅ ${message}`);
-        showToast(message || "Tarefa concluída!", 3800);
+        appendFeed(`✅ ${message}`, "done");
+        islandTitle.textContent = "Concluído";
+        islandSub.textContent = message || "Tarefa finalizada!";
+        if (btnKillSwitch) btnKillSwitch.classList.add("hidden");
         haptic(25);
+        aiHideLogTimer = setTimeout(() => {
+          if (aiState === "COMPLETED" && dynamicIslandWrap) dynamicIslandWrap.classList.add("hidden");
+        }, 5500);
       } else if (state === "ABORTED") {
         appendFeed("🛑 Interrompido — você está no controle.");
-        showToast("Controle manual retomado!", 2400);
+        if (dynamicIslandWrap) dynamicIslandWrap.classList.add("hidden");
+        showToast("Controle manual retomado!", 2200);
         haptic(30);
       } else if (state === "ERROR") {
-        appendFeed(`❌ ${message}`);
-        showToast(`Erro IA: ${message}`, 4500);
+        appendFeed(`❌ ${message}`, "error");
+        islandTitle.textContent = "Erro na IA";
+        islandSub.textContent = message || "Falha ao executar tarefa";
+        if (btnKillSwitch) btnKillSwitch.classList.add("hidden");
+        haptic(40);
+        // Keep error visible in Live Log for 8 seconds so user can always read what happened!
+        aiHideLogTimer = setTimeout(() => {
+          if (aiState === "ERROR" && dynamicIslandWrap) dynamicIslandWrap.classList.add("hidden");
+        }, 8000);
+      } else {
+        if (dynamicIslandWrap) dynamicIslandWrap.classList.add("hidden");
       }
     }
   }
@@ -944,10 +1023,12 @@
       holdTimer: setTimeout(() => {
         if (!orbDrag.moved) {
           orbDrag.longPressed = true;
-          haptic(25);
+          botPhys.dragging = false;
+          aiOrb.classList.remove("dragging");
+          haptic(28);
           startVoiceCapture(true);
         }
-      }, 360),
+      }, 220),
     };
     botPhys.dragging = true;
     aiOrb.classList.add("dragging");
@@ -957,7 +1038,7 @@
     if (!orbDrag.active || orbDrag.longPressed) return;
     const dx = e.clientX - orbDrag.startX;
     const dy = e.clientY - orbDrag.startY;
-    if (Math.hypot(dx, dy) > 6) {
+    if (Math.hypot(dx, dy) > 10) {
       orbDrag.moved = true;
       clearTimeout(orbDrag.holdTimer);
     }
@@ -971,7 +1052,7 @@
     }
   });
 
-  aiOrb.addEventListener("pointerup", () => {
+  function finishOrbPointer() {
     if (!orbDrag.active) return;
     clearTimeout(orbDrag.holdTimer);
     orbDrag.active = false;
@@ -979,6 +1060,7 @@
     aiOrb.classList.remove("dragging");
 
     if (orbDrag.longPressed) {
+      orbDrag.longPressed = false;
       stopVoiceCapture(true);
       return;
     }
@@ -999,32 +1081,73 @@
     if (!aiOverlay.classList.contains("hidden")) {
       aiPromptInput.focus();
     }
-  });
+  }
+  aiOrb.addEventListener("pointerup", finishOrbPointer);
+  aiOrb.addEventListener("pointercancel", finishOrbPointer);
 
-  // ==================== VOICE CAPTURE (NATIVE AUDIO + SPEECH RECOGNITION) ====================
+  // ==================== VOICE CAPTURE (NATIVE ANDROID HOLD-TO-TALK + WEB FALLBACK) ====================
   let mediaRecorder = null;
   let audioChunks = [];
   let speechRec = null;
   let recognizedText = "";
   let isRecording = false;
+  let usingNativeVoice = false;
+  let voiceAutoSend = true;
+  let voiceTimerInterval = null;
+  let voiceStartMs = 0;
+
+  // Callback invoked by Android Kotlin NativeBridge as soon as you release the Floating Bot!
+  window.__onNativeVoiceAudio = (b64, mime) => {
+    if (!b64) return;
+    if (voiceAutoSend) {
+      dispatchAITask(recognizedText, b64, mime || "audio/mp4");
+    }
+  };
+
+  function updateVoiceTimerUI() {
+    if (!voiceHudTimer) return;
+    const sec = Math.floor((performance.now() - voiceStartMs) / 1000);
+    const m = Math.floor(sec / 60);
+    const s = String(sec % 60).padStart(2, "0");
+    voiceHudTimer.textContent = `${m}:${s}`;
+  }
 
   async function startVoiceCapture(autoSendOnStop = false) {
     if (isRecording) return;
     isRecording = true;
+    usingNativeVoice = false;
+    voiceAutoSend = autoSendOnStop;
     recognizedText = "";
     audioChunks = [];
+    voiceStartMs = performance.now();
+
     btnVoiceToggle.classList.add("recording");
     aiOrb.classList.remove("state-idle");
     aiOrb.classList.add("state-listening");
+    if (liquidEdgeGlow) liquidEdgeGlow.classList.add("ai-active");
     if (botHero) {
       botHero.classList.remove("state-idle");
       botHero.classList.add("state-listening");
     }
     if (botHeroTitle) botHeroTitle.textContent = "Ouvindo você...";
-    if (botHeroSub) botHeroSub.textContent = "Fale o que deseja que eu faça na tela";
-    showToast("🎙️ Ouvindo... fale sua instrução", 2000);
+    if (botHeroSub) botHeroSub.textContent = "Solte o botão quando terminar de falar";
+    if (voiceHud) voiceHud.classList.remove("hidden");
+    updateVoiceTimerUI();
+    clearInterval(voiceTimerInterval);
+    voiceTimerInterval = setInterval(updateVoiceTimerUI, 250);
 
-    // 1. Web Speech API (instant PT-BR transcription for Claude / OpenAI / preview)
+    // Priority 1: Native Android MediaRecorder (works 100% over HTTP LAN/Tailscale, zero HTTPS restriction!)
+    if (window.AnyDaskNative && window.AnyDaskNative.hasNativeVoice && window.AnyDaskNative.hasNativeVoice()) {
+      try {
+        const started = window.AnyDaskNative.startNativeVoice();
+        if (started) {
+          usingNativeVoice = true;
+          return;
+        }
+      } catch {}
+    }
+
+    // Priority 2: Web Speech API + MediaRecorder fallback (when opened in desktop browser / HTTPS)
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SR) {
       try {
@@ -1042,7 +1165,6 @@
       } catch {}
     }
 
-    // 2. Raw Audio Recorder (for Gemini native multimodal audio!)
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1050,7 +1172,7 @@
         mediaRecorder.ondataavailable = (ev) => { if (ev.data.size > 0) audioChunks.push(ev.data); };
         mediaRecorder.onstop = async () => {
           stream.getTracks().forEach((tr) => tr.stop());
-          if (autoSendOnStop) {
+          if (voiceAutoSend) {
             const audioB64 = await blobsToBase64(audioChunks);
             dispatchAITask(recognizedText, settings.provider === "gemini" ? audioB64 : "", mediaRecorder.mimeType || "audio/webm");
           }
@@ -1058,25 +1180,41 @@
         mediaRecorder.start();
       } catch {
         if (!speechRec) {
-          showToast("Microfone indisponível (use HTTPS/localhost ou digite o comando)", 3200);
+          showToast("Atualize o APK v1.0.4 para Hold-to-Talk nativo sem HTTPS", 3400);
           stopVoiceCapture(false);
         }
       }
+    } else if (!speechRec) {
+      showToast("Atualize o APK v1.0.4 para gravar voz segurando o Bot!", 3400);
+      stopVoiceCapture(false);
     }
   }
 
   function stopVoiceCapture(autoSend = false) {
     if (!isRecording) return;
     isRecording = false;
+    voiceAutoSend = autoSend;
+    clearInterval(voiceTimerInterval);
+    if (voiceHud) voiceHud.classList.add("hidden");
     btnVoiceToggle.classList.remove("recording");
     aiOrb.classList.remove("state-listening");
     aiOrb.classList.add("state-idle");
+    if (liquidEdgeGlow && aiState !== "THINKING" && aiState !== "ACTING") {
+      liquidEdgeGlow.classList.remove("ai-active");
+    }
     if (botHero) {
       botHero.classList.remove("state-listening");
       botHero.classList.add("state-idle");
     }
     if (botHeroTitle) botHeroTitle.textContent = "AnyDask AI";
     if (botHeroSub) botHeroSub.textContent = "Estou vendo sua tela. O que fazemos?";
+
+    if (usingNativeVoice && window.AnyDaskNative && window.AnyDaskNative.stopNativeVoice) {
+      usingNativeVoice = false;
+      haptic(18);
+      window.AnyDaskNative.stopNativeVoice(!autoSend);
+      return;
+    }
 
     if (speechRec) { try { speechRec.stop(); } catch {} speechRec = null; }
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
@@ -1116,7 +1254,9 @@
     }
 
     aiFeed.innerHTML = "";
-    appendFeed(`💬 "${prompt || "Instrução por voz"}"`);
+    if (aiLiveLog) aiLiveLog.innerHTML = "";
+    startAITimer();
+    appendFeed(prompt ? `💬 "${prompt}"` : "🎙️ Instrução por voz enviada");
     const ok = sendControl("ai.start_task", {
       prompt,
       audio_base64: audioBase64,

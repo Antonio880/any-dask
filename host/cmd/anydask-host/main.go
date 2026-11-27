@@ -200,7 +200,7 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 func loadDefaultAIConfig() map[string]any {
 	out := map[string]any{
 		"provider":        "gemini",
-		"model":           "gemini-3-flash-preview",
+		"model":           "gemini-3.1-flash-lite",
 		"api_key":         "",
 		"base_url":        "",
 		"require_confirm": true,

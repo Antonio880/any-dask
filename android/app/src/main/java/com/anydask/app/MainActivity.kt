@@ -7,11 +7,13 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.media.MediaRecorder
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.util.Base64
 import android.view.View
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
@@ -26,11 +28,15 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private var isLandscape = false
+    private var mediaRecorder: MediaRecorder? = null
+    private var voiceFile: File? = null
+    private var isRecordingVoice = false
 
     companion object {
         private const val PREFS_NAME = "anydask_native_prefs"
@@ -143,6 +149,24 @@ class MainActivity : AppCompatActivity() {
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
+    private fun stopRecorderQuietly() {
+        isRecordingVoice = false
+        try {
+            mediaRecorder?.stop()
+        } catch (_: Exception) {
+        }
+        try {
+            mediaRecorder?.release()
+        } catch (_: Exception) {
+        }
+        mediaRecorder = null
+    }
+
+    override fun onDestroy() {
+        stopRecorderQuietly()
+        super.onDestroy()
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView.canGoBack()) {
@@ -155,6 +179,81 @@ class MainActivity : AppCompatActivity() {
     inner class NativeBridge {
         @JavascriptInterface
         fun isNativeApp(): Boolean = true
+
+        @JavascriptInterface
+        fun hasNativeVoice(): Boolean = true
+
+        @JavascriptInterface
+        fun startNativeVoice(): Boolean {
+            if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                runOnUiThread {
+                    ActivityCompat.requestPermissions(
+                        this@MainActivity,
+                        arrayOf(Manifest.permission.RECORD_AUDIO),
+                        REQ_AUDIO
+                    )
+                }
+                return false
+            }
+            return try {
+                stopRecorderQuietly()
+                val out = File(cacheDir, "anydask_voice_${System.currentTimeMillis()}.m4a")
+                val mr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    MediaRecorder(this@MainActivity)
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaRecorder()
+                }
+                mr.setAudioSource(MediaRecorder.AudioSource.MIC)
+                mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                mr.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                mr.setAudioSamplingRate(16000)
+                mr.setAudioEncodingBitRate(32000)
+                mr.setOutputFile(out.absolutePath)
+                mr.prepare()
+                mr.start()
+                mediaRecorder = mr
+                voiceFile = out
+                isRecordingVoice = true
+                true
+            } catch (_: Exception) {
+                stopRecorderQuietly()
+                false
+            }
+        }
+
+        @JavascriptInterface
+        fun stopNativeVoice(cancel: Boolean) {
+            val file = voiceFile
+            val wasRec = isRecordingVoice
+            stopRecorderQuietly()
+            if (!wasRec || file == null || !file.exists()) return
+
+            if (cancel) {
+                file.delete()
+                return
+            }
+
+            Thread {
+                try {
+                    val bytes = file.readBytes()
+                    file.delete()
+                    if (bytes.size > 512) {
+                        val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                        runOnUiThread {
+                            webView.evaluateJavascript(
+                                "window.__onNativeVoiceAudio && window.__onNativeVoiceAudio('$b64','audio/mp4');",
+                                null
+                            )
+                        }
+                    }
+                } catch (_: Exception) {
+                    try { file.delete() } catch (_: Exception) {}
+                }
+            }.start()
+        }
 
         @JavascriptInterface
         fun toggleOrientation() {

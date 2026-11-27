@@ -140,19 +140,19 @@ func (o *Orchestrator) runLoop(
 		}
 
 		if o.overlay != nil {
-			o.overlay.SetState(overlay.StateAIThinking, "AnyDask AI · Analisando...")
+			o.overlay.SetState(overlay.StateAIThinking, fmt.Sprintf("AnyDask AI · Passo %d", step))
 		}
 		sink("ai.status", protocol.AIStatusPayload{
 			TaskID:  taskID,
 			State:   "THINKING",
-			Message: fmt.Sprintf("Analisando tela (%s)...", provider.Name()),
+			Message: "📸 Capturando tela...",
 			Step:    step,
 			MaxStep: maxSteps,
 		})
 
-		// 1. Capture crisp screenshot directly from the currently selected monitor
+		// 1. Capture crisp screenshot (1024px wide -> ~50KB for ultra-fast <1.5s LLM roundtrip)
 		b := o.arbiter.ScreenBounds()
-		snap, err := capture.CaptureSnapshotForDisplay(1280, o.arbiter.ActiveDisplay(), b.X, b.Y, b.Width, b.Height)
+		snap, err := capture.CaptureSnapshotForDisplay(1024, o.arbiter.ActiveDisplay(), b.X, b.Y, b.Width, b.Height)
 		if err != nil {
 			sink("ai.status", protocol.AIStatusPayload{
 				TaskID:  taskID,
@@ -162,6 +162,14 @@ func (o *Orchestrator) runLoop(
 			return
 		}
 		sysInfo := osctx.Collect()
+
+		sink("ai.status", protocol.AIStatusPayload{
+			TaskID:  taskID,
+			State:   "THINKING",
+			Message: fmt.Sprintf("🧠 Pensando (%s)...", provider.Name()),
+			Step:    step,
+			MaxStep: maxSteps,
+		})
 
 		turnReq := TurnRequest{
 			UserPrompt:    req.Prompt,
@@ -180,12 +188,14 @@ func (o *Orchestrator) runLoop(
 		}
 
 		// 2. Call active LLM adapter
+		callStart := time.Now()
 		resp, err := provider.NextAction(ctx, turnReq)
+		callMs := time.Since(callStart).Milliseconds()
 		if err != nil {
 			if ctx.Err() != nil {
 				return
 			}
-			log.Printf("[agent] provider error step %d: %v", step, err)
+			log.Printf("[agent] provider error step %d (%dms): %v", step, callMs, err)
 			sink("ai.status", protocol.AIStatusPayload{
 				TaskID:  taskID,
 				State:   "ERROR",
@@ -195,6 +205,7 @@ func (o *Orchestrator) runLoop(
 			})
 			return
 		}
+		log.Printf("[agent] step %d LLM responded in %dms -> %s (%s)", step, callMs, resp.Action.Name, resp.Action.Reason)
 
 		act := resp.Action
 		if act.Name == "task_complete" {

@@ -53,9 +53,13 @@ Voltar para [[00-INDEX]] | Ver arquitetura em [[01-ARCHITECTURE]] | Ver design e
 - [x] **Portal Liquid Glass de Conexão & Fix WebView Android (`v1.0.3`):**
   - [x] Tela de conexão Apple Liquid Glass com Bot animado + anéis orbitais + stepper (`Sinal -> Túnel P2P -> 60 FPS`) e vídeo oculto até o 1º frame real decodificado
   - [x] `MainActivity.kt` sobrescrevendo `getDefaultVideoPoster()` (elimina o ícone cinza ▶ esticado do Android WebView) + `LOAD_NO_CACHE` + `clearCache(true)` (resolve cache preso de UI antiga)
+- [x] **Computer Use Ultra-Rápido (~1.5s/passo) + Hold-to-Talk Nativo (`v1.0.4`):**
+  - [x] Benchmark ao vivo detectou timeout no `gemini-3-flash-preview` (>25s) e validou **`gemini-3.1-flash-lite` em 1.4s–1.7s** -> novo default + cadeia de fallback automática + timeout 16s + screenshot 1024px (~50KB)
+  - [x] **Console ao Vivo Liquid Glass (`#aiLiveLog`)** abaixo da Dynamic Island + cronômetro ao vivo (`0.0s`) exibindo cada etapa, ação, saída e erro em tempo real
+  - [x] **Hold-to-Talk nativo no Bot Flutuante** (`MainActivity.kt` `MediaRecorder` AAC `audio/mp4` sem depender de HTTPS + `#voiceHud` ao vivo): segura o Bot -> grava -> solta -> envia na hora para o Gemini agir!
 
 ### 🚧 In Progress
-- [ ] Atualização final no celular (`v1.0.3`) + PC/Mac para validar o portal de conexão e o botão `🖥 1/2` ao vivo
+- [ ] Validação ao vivo do Hold-to-Talk e do agente ultra-rápido (`~1.5s/passo`) no Android (`v1.0.4`) + Windows 11 + Mac
 
 ### 📌 Próximo Passo Imediato
 1. Rodar `bin\anydask-host.exe` neste Windows 11 para o usuário testar já no Android!
